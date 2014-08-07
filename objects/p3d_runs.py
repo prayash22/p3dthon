@@ -317,9 +317,8 @@ class p3d_run(object):
         2014-08-07
         """
         if (not hasattr(self,'movie') or change_movie == True):
-            print 'Hello Colby we made it inside this if statment'
             self._reff_movie()
-        self.movie.load_movie(var,time)
+        return self.movie.load_movie(var,time)
 
 
     def _reff_movie(self,movie_num=-1):
