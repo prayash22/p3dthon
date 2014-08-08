@@ -29,17 +29,44 @@ and run your scripts, with
 
 ipython --pylab
 
+You should also add the p3dthon direcotory to your path. I would just go ahead and add the following lines 
+in your ipython config startup file:
+in the file located at
+    ~/.ipython/profile_default/startup/ipython_config.py 
+Add the following code
+#
+import sys
+sys.path.append('/glade/u/home/colbyh/pythonprogs/2014.04.p3d_etal/p3dthon/objects/')
+sys.path.append('/glade/u/home/colbyh/pythonprogs/2014.04.p3d_etal/p3dthon/scripts/')
+from p3d_runs import p3d_run
+#
+
+this will let you use p3d_runs right off the bat.
 Good luck!
 
 ########################### HOW-TO ########################################
-First you need to tell python to look at the code we are going to be using 
-to create the run object this is done with the folowing:
+To create the run object, do the following
 
-    from p3d_runs import p3d_run
-    reconn331 = p3d_run('reconn331')
+    CR = p3d_run('run_type###')
+
+where CR just the varible name you choose to use
+and run_type### is the name you will be using to identify your run
+I usealy just use CR, and reconn601 or what ever number it maybe.
+
+Read the dialogs when they come up and respond acordingly
+
+to load a moive just use
+
+    var = CR.load_movie()
+
+and this will bring up a dialog that should let you load a moive
 
 
 
+####################### Edit: 2014.08.07 -Colby ############################
+God I have done a lot of work on this stuff. So we have two main classes a run class
+and a movie class. the movie class is called from innside the run class.
+Most things still work the same but I have been trying to create a solid fondation.
 
 ####################### Edit: 2013.10.30 -Colby ############################
 I am tring to slowly move from IDL to python and so this diretory is my scratch work for this.
