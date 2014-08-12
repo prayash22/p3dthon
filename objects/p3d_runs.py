@@ -55,7 +55,7 @@ SCRATCH_PATH = '/glade/scratch/'+USER+'/'
 class p3d_run(object):
     """p3d_run object """
 
-    def __init__(self, runname): 
+    def __init__(self,runname=''): 
         """ Initilazition Routine for the p3d_run object
 
         Fill in method discription
@@ -71,17 +71,38 @@ class p3d_run(object):
         2013-05-01
         11:21:19.671182
         """
-        print P3DTHON_PATH
+        if len(runname) == 0: # Start init prompt
+            runname = raw_input('Please enter the runname (enter local to not save/load data): ') 
 
-        self.run_info_dict={'run_name':runname.lower()}
+        if runname.lower() == 'local' or runname == '':
+            print 'No run info chosen, using local parameters.'
+            self._init_local()
+        else:
+            print "Using run %s for the run.info run name."%runname
+            self._init_file(runname)
+
+
+    def _init_file(self,runname):
+        """ Initilazition Routine for the p3d_run object that saves the runs information
+
+        Fill in method discription
+
+        @param runname    : The string to identify runs, It should just corspond to a p3d run name
+
+        @return: @todo
+
+        Example  :
+        """
+        self.run_info_dict={'run_name':runname}
 
 # First Check to see if the runname.info file exsists for this run
-        self.run_info_file = P3DTHON_PATH+'p3dthon/run_info/'+runname.lower()+'.info'
+        self.run_info_file = P3DTHON_PATH+'p3dthon/run_info/'+runname+'.info'
 # Lets try to using the pwd to acess the run_info directory
         if os.path.isfile(self.run_info_file):
 # File exsists! load up all the run data
             print 'File found and opened!!'
             self.load_info_file()
+            self.use_file=True
         else:
             print 'WARNING: '+self.run_info_file+' dose not exsist!'
             print "Do you want to create a new run.info file for this run?('y'/'')"
@@ -90,13 +111,13 @@ class p3d_run(object):
                 print "### Creating new run: "
                 print "### run.info file = " + self.run_info_file
                 self.create_info_file()
+                self.use_file=True
             else:
-                print "Do you want a temporary object to use the methods?('y'/'')"
-                get_raw = raw_input()
-                if get_raw.lower() == 'y':
-                    print 'Not coded yet! talk to colby about this!'
-                else:
-                    print 'Not coded yet! talk to colby about this!'
+                print 'Not coded yet! talk to colby about this!'
+
+    def _init_local(self):
+        self.use_file=False
+        self.run_info_dict={'run_name':'local'}
 
 
 ########################################################################################################################################################
@@ -108,59 +129,64 @@ class p3d_run(object):
     def load_info_file(self):
         """ Class Method: uses preset file name for run info file and gets all items
         """
+        if self.use_file:
 # Open the .info file and get all of the items
-        with open(self.run_info_file) as fname:
-            run_info_content = fname.readlines()
-        fname.close()
+            with open(self.run_info_file) as fname:
+                run_info_content = fname.readlines()
+            fname.close()
 # Go through Items and write them to the run info dictionary
-        file_header = ''
-        for item in run_info_content:
-            if len(item.strip())>0:
-                if item[0] != '!':
-                    run_key = item.strip().split()[0]
-                    run_val = item.strip().split()[1:]
+            file_header = ''
+            for item in run_info_content:
+                if len(item.strip())>0:
+                    if item[0] != '!':
+                        run_key = item.strip().split()[0]
+                        run_val = item.strip().split()[1:]
 ####################################################################################################################################################### Colby DEBUG what ever this issue is 
 ## Colby Move this section to the wrigting section, It seems usefull to leave info in lists, but only write them out as strings
-                    # We need to make sure that we are not wrighing things as lists
-                    if type(run_val) is list:
-                        if len(run_val) < 2:
-                            run_val = run_val[0]
-                        else:
-                            temp_run_val =  ''
-                            for elements in range(len(run_val)):
-                                temp_run_val = temp_run_val + ' ' + str(run_val[elements])
-                            run_val = temp_run_val.strip()
+                        # We need to make sure that we are not wrighing things as lists
+                        if type(run_val) is list:
+                            if len(run_val) < 2:
+                                run_val = run_val[0]
+                            else:
+                                temp_run_val =  ''
+                                for elements in range(len(run_val)):
+                                    temp_run_val = temp_run_val + ' ' + str(run_val[elements])
+                                run_val = temp_run_val.strip()
 
-                    self.run_info_dict[run_key] = run_val
-                else: 
-                    if item.find('! File Last Updated on') < 0:
-                        file_header = file_header+item
-            if len(file_header) > 0:
-                self.run_info_dict['file_header'] = file_header
+                        self.run_info_dict[run_key] = run_val
+                    else: 
+                        if item.find('! File Last Updated on') < 0:
+                            file_header = file_header+item
+                if len(file_header) > 0:
+                    self.run_info_dict['file_header'] = file_header
+        else:
+            return self.use_file
 
 
     def create_info_file(self):
         """ Class Method: Creates an info file for a previsouly un named run
         """
-        if os.path.isfile(self.run_info_file):
-            print '!!!!!!! BIG ISSUE !!!!!!!!'
-            print 'run.info file '+self.run_info_file+' exsists! Can not create file'
-            print 'Abortting!!'
-            return -1
-        f = open(self.run_info_file,'w+')
-        now = datetime.datetime.now()
-        file_header = '! run.info file = '+self.run_info_file+'\n' + \
-                      '! File Created With ' + os.getcwd()+'/p3d_runs.py\n' + \
-                      '! File Created on ' + str(now.year)+'.'+str(now.month)+'.'+ str(now.day)+ \
-                      ' at ' + str(now.hour)+':'+str(now.minute)+':'+ str(now.second)+ \
-                      ' (Hr:Min:Sec) (NOTE: if yellowstone then Mnt Std Time)\n' \
-                      '\n'
-        f.write(file_header)
-        f.close()
+        if self.use_file:
+            if os.path.isfile(self.run_info_file):
+                print '!!!!!!! BIG ISSUE !!!!!!!!'
+                print 'run.info file '+self.run_info_file+' exsists! Can not create file'
+                print 'Abortting!!'
+                return -1
+            f = open(self.run_info_file,'w+')
+            now = datetime.datetime.now()
+            file_header = '! run.info file = '+self.run_info_file+'\n' + \
+                          '! File Created With ' + os.getcwd()+'/p3d_runs.py\n' + \
+                          '! File Created on ' + str(now.year)+'.'+str(now.month)+'.'+ str(now.day)+ \
+                          ' at ' + str(now.hour)+':'+str(now.minute)+':'+ str(now.second)+ \
+                          ' (Hr:Min:Sec) (NOTE: if yellowstone then Mnt Std Time)\n' \
+                          '\n'
+            f.write(file_header)
+            f.close()
+        else: return self.use_file
 
 # I think the best way to saftly wright is to read the file, add or modify an item to the dict, then rewrite it
     
-    def add_info_keyval(self,key,val):
+    def _add_info_keyval(self,key,val,path_flag=False):
         """ adds or modifies an item in the run.info file
 
         Fill in method discription
@@ -177,28 +203,32 @@ class p3d_run(object):
         2013-05-01
         11:21:19.671182
         """
+        if self.use_file:
+            if path_flag : val = os.path.abspath(val)
 # First we reread the run.info file so that every thing will remain up to date
-        self.load_info_file()
+            self.load_info_file()
 # Next we check to see if we will be over righting any thing
-        if self.run_info_dict.has_key(key):
-            print 'WARNING: Trying to overwrite key'+key
-            print '         with value of '+self.run_info_dict[key]
-            print '         with new value of '+val
-            print "Do you want to procced? ('y'/'')"
-            get_raw = raw_input()
-            if get_raw.lower() == 'y':
-                print "### Modifing run.info: "
-                self.run_info_dict[key] = val
-                self.rewrite_info_file()
+            if self.run_info_dict.has_key(key):
+                print 'WARNING: Trying to overwrite key'+key
+                print '         with value of '+self.run_info_dict[key]
+                print '         with new value of '+val
+                print "Do you want to procced? ('y'/'')"
+                get_raw = raw_input()
+                if get_raw.lower() == 'y':
+                    print "### Modifing run.info: "
+                    self.run_info_dict[key] = val
+                    self._rewrite_info_file()
+                else:
+                    return 0 
             else:
-                return 0 
-        else:
-            print "### Adding info {'%s' : '%s'} to run.info %s" % (key,val,self.run_info_file)
+                print "### Adding info {'%s' : '%s'} to run.info %s" % (key,val,self.run_info_file)
+                self.run_info_dict[key] = val
+                self._rewrite_info_file()
+        else: 
             self.run_info_dict[key] = val
-            self.rewrite_info_file()
             
 
-    def rewrite_info_file(self):
+    def _rewrite_info_file(self):
         """ take the current run_info_dict, and writes it to run.info file
             This is a scarry method and you should be very carfull with it.
             It will happly erase your run.info file and not feal bad at all
@@ -215,20 +245,22 @@ class p3d_run(object):
         2013-05-01
         11:21:19.671182
         """
-        now = datetime.datetime.now()
-        file_text = self.run_info_dict['file_header']+'\n' + \
-                      '! File Last Updated on ' + str(now.year)+'.'+str(now.month)+'.'+ str(now.day)+ \
-                      ' at ' + str(now.hour)+':'+str(now.minute)+':'+ str(now.second) +'\n\n'
-        for keys in self.run_info_dict.keys():
-            if keys != 'file_header':
-                file_text = file_text+str(keys)+' '+str(self.run_info_dict[keys])+'\n'
+        if self.use_file:
+            now = datetime.datetime.now()
+            file_text = self.run_info_dict['file_header']+'\n' + \
+                          '! File Last Updated on ' + str(now.year)+'.'+str(now.month)+'.'+ str(now.day)+ \
+                          ' at ' + str(now.hour)+':'+str(now.minute)+':'+ str(now.second) +'\n\n'
+            for keys in self.run_info_dict.keys():
+                if keys != 'file_header':
+                    file_text = file_text+str(keys)+' '+str(self.run_info_dict[keys])+'\n'
 
-        f = open(self.run_info_file,'w')
-        f.write(file_text)
-        f.close()
+            f = open(self.run_info_file,'w')
+            f.write(file_text)
+            f.close()
+        else: return self.use_file
         
 
-    def test_info_key(self,key,info_discription='',path_flag=False):
+    def _test_info_key(self,key,info_discription='',path_flag=False):
         """ A Method that checks to seff a this peice of info is in the run.info file
             If the peice of info is not contained it addes its to the set
         """
@@ -244,8 +276,8 @@ class p3d_run(object):
                 if len(info_discription) >0:
                     print 'Info Discription: %s' % (info_discription)
                 get_raw = raw_input()
-                if path_flag: self.add_info_keyval(key,os.path.abspath(get_raw))
-                else: self.add_info_keyval(key,get_raw)
+                if path_flag: self._add_info_keyval(key,os.path.abspath(get_raw))
+                else: self._add_info_keyval(key,get_raw)
                 
     def change_info_val(self,key,info_discription='',path_flag=False):
         """ A Method that allows you to change a value coresponding to a particular key in the run.info file
@@ -262,7 +294,7 @@ class p3d_run(object):
             if len(info_discription) >0:
                 print 'Info Discription: %s' % (info_discription)
             get_raw = raw_input()
-            self.add_info_keyval(key,get_raw)
+            self._add_info_keyval(key,get_raw)
 
 ########################################################################################################################################################
 #       End:                                     Edit run.info file                                                                                   #
@@ -275,7 +307,7 @@ class p3d_run(object):
             It will try and then ask for where the file is. if it doent know
         """
 # load_param requires a path for the param file! a run_info_dict entry of 'param_path'
-        if self.test_info_key('param_path','Full path of param file for this run, included the files name',path_flag=True) == -1:
+        if self._test_info_key('param_path','Full path of param file for this run, included the files name',path_flag=True) == -1:
             print 'Necesarry Path for the Param File not Set!!! ABORTING!!!'
             return -1
         self.param_dict = {}
@@ -302,7 +334,7 @@ class p3d_run(object):
                     val = 'NO_ARG'
                 self.param_dict[key] = val
 
-    def load_movie(self,var='NOT_SET',time=-1,change_movie=False):
+    def load_movie(self,var='NOT_SET',time=-1,change_movie=False): #Colby add this, if there is any update to the p3d run reload the movie
         """ Outer class wrapper for the inner class method load_movie
 
         Load movie files for a given set of varibles.
@@ -321,6 +353,7 @@ class p3d_run(object):
         return self.movie.load_movie(var,time)
 
 
+
     def _reff_movie(self,movie_num=-1):
         import p3d_movie
 # load_param requires a path for the param file! a run_info_dict entry of 'param_path'
@@ -328,7 +361,7 @@ class p3d_run(object):
 # load_movie_log requires a path for the log file! a run_info_dict entry of 'movie_path'
 #
 #CoOLBY!!! make sure you pad movie num
-        if self.test_info_key('movie_path','Path of directory for movie files for this run',path_flag=True) == -1:
+        if self._test_info_key('movie_path','Path of directory for movie files for this run',path_flag=True) == -1:
             print 'Necesarry Path for the Movie.log File not Set!!! ABORTING!!!'
             return -1    
         print self.run_info_dict['movie_path']
@@ -348,6 +381,28 @@ class p3d_run(object):
         """ A Method that returns all of the run information that the object has
         """
 
+    def load_idl_restore(self,restore_path=''): # allowing the user to supply the restore path seems like an awful way to
+    # code this, Just totaly the oppisit of what I am going for with this code. you should fix it colby
+        """
+#---------------------------------------------------------------------------------------------------------------
+#   Method: restore_idl
+#   Args  : movie_num (to identify which of the posible several movie files to read from)
+#         : movie_time (to identify which slice of time should be read)
+#       This accepts the run name idetifies the coresponding
+#       information in the run_list.dat file.
+#---------------------------------------------------------------------------------------------------------------
+        """
+        if len(restore_path) == 0: 
+            if 'idl_restore_path' in self.run_info_dict:
+                restore_path = self.run_info_dict['idl_restore_path']
+            else:
+                print 'No IDL restore file found!'
+                if self._test_info_key('idl_restore_path','Full path of IDL restore file for this run, included the files name',path_flag=True) == -1:
+                    print 'Necesarry Path for the IDL restore File not Set!!! ABORTING!!!'
+                    return -1
+                restore_path = self.run_info_dict['idl_restore_path']
+        print 'Restoreing IDL file "'+restore_path+'"'
+        return readsav(restore_path)
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
