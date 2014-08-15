@@ -51,13 +51,13 @@ class vdist(object):
             self.p3d_run_flag = True
             self.p3d_run = arg
             self.p3d_run.load_param()
-            print 'Using data from p3d_run object '+arg.run_id_dict['run_name']
+            print 'Using data from p3d_run object '+self.p3d_run.run_info_dict['run_name']
         elif isinstance(arg,str) and arg != 'no_path':
             print 'No p3d_run object given, using path '+arg
             self.dump_path = arg
         else:
             print 'We need a path to proceed with this class (./ for current)'
-            self.dump_path = rawinput()
+            self.dump_path = raw_input()
             print 'No p3d_run object given, using path '+self.dump_path
 # We should realy have a check to make sure these open, and then handel the error
 # Colby please code later
@@ -91,7 +91,7 @@ class vdist(object):
         for tries in range(5):
             self.dump_ext =  raw_input()
             fname = self.dump_path + '/p3d-001.'+self.dump_ext
-            try
+            try:
                 f = open(fname, "rb")
                 read_success_flag = True
             except IOError as e:
@@ -225,11 +225,11 @@ class vdist(object):
 #
 # Right now im only coding the faster one
         verboseprint('Calculating B field')
-# You need to code this to get rid of the param_dict call
+# You need to code this to get rid of the p3d_run.param_dict call
 # or aleat put in an if statment to differentiate
-        bx_interp = interp_field(dump_field_dict['bx'],self.param_dict['lx'],self.param_dict['ly'],r_simUnit[0],r_simUnit[1])
-        by_interp = interp_field(dump_field_dict['by'],self.param_dict['lx'],self.param_dict['ly'],r_simUnit[0],r_simUnit[1])
-        bz_interp = interp_field(dump_field_dict['bz'],self.param_dict['lx'],self.param_dict['ly'],r_simUnit[0],r_simUnit[1])
+        bx_interp = interp_field(dump_field_dict['bx'],self.p3d_run.param_dict['lx'],self.p3d_run.param_dict['ly'],r_simUnit[0],r_simUnit[1])
+        by_interp = interp_field(dump_field_dict['by'],self.p3d_run.param_dict['lx'],self.p3d_run.param_dict['ly'],r_simUnit[0],r_simUnit[1])
+        bz_interp = interp_field(dump_field_dict['bz'],self.p3d_run.param_dict['lx'],self.p3d_run.param_dict['ly'],r_simUnit[0],r_simUnit[1])
         bmag_interp = (bx_interp**2+by_interp**2+bz_interp**2)**(.5)
 
         b_perp1y = -1.*bz_interp/(by_interp**2+bz_interp**2)**(.5)
@@ -408,9 +408,9 @@ class vdist(object):
 # Right now im only coding the faster one
         verboseprint('Calculating B field')
         
-        bx_interp = interp_field(dump_field_dict['bx'],self.param_dict['lx'],self.param_dict['ly'],r_simUnit[0],r_simUnit[1])
-        by_interp = interp_field(dump_field_dict['by'],self.param_dict['lx'],self.param_dict['ly'],r_simUnit[0],r_simUnit[1])
-        bz_interp = interp_field(dump_field_dict['bz'],self.param_dict['lx'],self.param_dict['ly'],r_simUnit[0],r_simUnit[1])
+        bx_interp = interp_field(dump_field_dict['bx'],self.p3d_run.param_dict['lx'],self.p3d_run.param_dict['ly'],r_simUnit[0],r_simUnit[1])
+        by_interp = interp_field(dump_field_dict['by'],self.p3d_run.param_dict['lx'],self.p3d_run.param_dict['ly'],r_simUnit[0],r_simUnit[1])
+        bz_interp = interp_field(dump_field_dict['bz'],self.p3d_run.param_dict['lx'],self.p3d_run.param_dict['ly'],r_simUnit[0],r_simUnit[1])
         bmag_interp = (bx_interp**2+by_interp**2+bz_interp**2)**.5
 
 #Colby employ a sign type thing here so that the axises work out right
@@ -497,11 +497,11 @@ class vdist(object):
             verboseprint = lambda *a: None      # do-nothing
 
 # Load the param, because we want to know which dump file will have which xvalues
-        self.load_param()
-        number_of_xprocs = self.param_dict['pex']
-        number_of_yprocs = self.param_dict['pey']
-        lx_simUnit = self.param_dict['lx']
-        ly_simUnit = self.param_dict['ly']
+        self.p3d_run.load_param()
+        number_of_xprocs = self.p3d_run.param_dict['pex']
+        number_of_yprocs = self.p3d_run.param_dict['pey']
+        lx_simUnit = self.p3d_run.param_dict['lx']
+        ly_simUnit = self.p3d_run.param_dict['ly']
 # Figure out which set of processors we are on
         x_lowerbound = x_simUnit - x_width_simUnit/2.
         x_upperbound = x_simUnit + x_width_simUnit/2.

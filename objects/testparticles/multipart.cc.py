@@ -23,7 +23,7 @@ class TPRun:
     def __init__(self,
                  npart=1,
                  charge=-1.,
-                 mass=0.01,
+                 mass=0.04,
                  run=000,
                  tstart=0,
                  tend=5.,
