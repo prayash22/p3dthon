@@ -326,7 +326,10 @@ class p3d_run(object):
             content = f.readlines()
         for item in content:
             if '#define' in item and item[0] != '!':
-                if len(item.split()) > 2: key = item.split()[1] val = convert(item.split()[2]) else:
+                if len(item.split()) > 2: 
+                    key = item.split()[1] 
+                    val = convert(item.split()[2]) 
+                else:
                     key = item.split()[1]
                     val = 'NO_ARG'
                 self.param_dict[key] = val
@@ -371,6 +374,30 @@ class p3d_run(object):
 
 
         self.movie = p3d_movie.p3d_movie(self.run_info_dict['movie_path'],self.param_dict,movie_num)
+
+    def _reff_dump(self,dump_num=-1):
+        import p3d_dump
+# load_param requires a path for the param file! a run_info_dict entry of 'param_path'
+
+# load_movie_log requires a path for the log file! a run_info_dict entry of 'movie_path'
+#
+#CoOLBY!!! make sure you pad movie num
+
+################################################################# foobar you stoped here
+        if self._test_info_key('dump_path','Full path of dump files for this run',path_flag=True) == -1:
+            print 'Necesarry Path for the Param File not Set!!! ABORTING!!!'
+            return -1
+
+        print self.run_info_dict['dump_path']
+        if not os.path.isdir(self.run_info_dict['dump_path']): 
+            print 'Dir %s not found!!!'%self.run_info_dict['dump_path']
+            self.change_info_val('dump_path','Path for the current set of movie files')
+
+
+        if not (hasattr(self,'param_dict')): self.load_param()
+
+
+        self.dump = p3d_dump.p3d_dump(self.run_info_dict['dump_path'],self.param_dict,dump_num)
         
 
 
@@ -416,134 +443,11 @@ class p3d_run(object):
 #---------------------------------------------------------------------------------------------------------------
         """
 
-        if verbose:
-            def verboseprint(*args):
-# Print each argument separately so caller doesn't need to
-# stuff everything to be printed into a single string
-                for arg in args:
-                    print arg,
-                print
-        else:   
-            verboseprint = lambda *a: None      # do-nothing
-
 # load_param requires a path for the param file! a run_info_dict entry of 'param_path'
-        if self._test_info_key('dump_path','Full path of dump files for this run',path_flag=True) == -1:
-            print 'Necesarry Path for the Param File not Set!!! ABORTING!!!'
-            return -1
-# Add a try catch statment incase you cant find the file
-        fname = '%s/p3d.%s.%s'%(os.path.abspath(self.run_info_dict['dump_path']),
-                 self._num_to_ext(dump_index),self._num_to_ext(dump_num))
+        self._reff_dump()
+        
+        self.dump.read_dump_file(dump_index)
 
-# Make sure that the file exsists and suguset alternetives to fix it
-        try:
-            f = open(fname, "rb")
-        except IOError as e:
-            print "I/O error({0}): {1}".format(e.errno, e.strerror)
-            print "ERROR: Could not open file. " + fname
-            print "Possible Reasons:"
-            print "     File does not exist"
-            print "     File extention is wrong"
-            print "     run_list.dat is not set properly (i.e. looking in the wrong directory)"
-            return -1
-
-
-# First we need to deal with special case of if it is a field file
-# If the dump file we are trying to read is the first, we need to first read the fields and then the particles 
-        if dump_index == '001':
-            print 'NOT CODED YET'
-            print "Reading Dump File '"+fname+"'"
-            print "Reading Header: "
-            header_chunksize=44 # Size of the header in bytes
-            header_binary = f.read(header_chunksize)
-            header = struct.unpack('<idd6i', header_binary)
-            print "              : "+str(header)
-            px = header[3]
-            py = header[4]
-            bufsize = header[-3]
-            number_of_pey = header[-2]
-            print 'bufsize = '+str(bufsize)
-            print 'px = '+str(px)
-            print 'py = '+str(py)
-
-            dump_field_dict={}
-            for field_var in ['ex','ey','ez','bx','by','bz']:
-                dump_dat=[]
-                for pey_current in range(py):
-                    pad_head = struct.unpack('<i',f.read(4))[0]
-                    dump_dat.append(np.fromfile(f,dtype='float64',count=pad_head/8)) # Float size times number of floats
-                    pad_butt = struct.unpack('<i',f.read(4))[0]
-                dump_dat = np.concatenate(dump_dat)
-                dump_dat.shape = (py,px)
-                self.dump_field_dict[field_var] = dump_dat
-# You should relly wtright in a check to compare pex from param to what you find here
-# Like they do in p3d
-
-# Now we open 
-        else:
-            verboseprint("Reading Dump File '"+fname+"'")
-            verboseprint("Reading Header: ")
-            header_chunksize=44 # Size of the header in bytes
-            header_binary = f.read(header_chunksize)
-            header = struct.unpack('<idd6i', header_binary)
-            verboseprint("              : "+str(header))
-            bufsize = header[-3]
-            number_of_pey = self.param_dict['pey']#header[-2]
-            verboseprint('bufsize = '+str(bufsize))
-            verboseprint('number of pey = '+str(number_of_pey))
-            
-        dt = np.dtype([('x', 'float32'), ('y', 'float32'), ('z', 'float32'),('vx', 'float32'), ('vy', 'float32'), ('vz', 'float32')])
-        all_particles = [] 
-        for species in range(2): 
-            pad_head = struct.unpack('<i',f.read(4))[0]
-            verboseprint('Note sure about the point of this number? ' +str(struct.unpack('<i',f.read(4))[0]))
-            pad_butt = struct.unpack('<i',f.read(4))
-            all_sub_species = []
-            for current_sub_proc in range(number_of_pey):
-                pad_head = struct.unpack('<i',f.read(4))[0]
-                number_of_part_on_pe = struct.unpack('<i',f.read(4))[0]
-                pad_butt = struct.unpack('<i',f.read(4))
-                dump_dat=[]
-                bufsize_lastcase = number_of_part_on_pe % bufsize
-                verboseprint('Reading from proc number: '+str(current_sub_proc)+' Number of part on sub proc: '+str(number_of_part_on_pe))
-                for current_sub_buffer in range(number_of_part_on_pe/bufsize): 
-                    pad_head = struct.unpack('<i',f.read(4))[0]
-                    #print 'Reading Buffer number: '+str(current_sub_buffer)+' Size of next set of bytes: '+str(pad_head)
-# Colby Maybe try switching these two to see if it runs faster. The two should be Equivelent
-#   1:
-#;#                all_particles_from_file = np.append(all_particles_from_file,np.fromfile(f,dtype=dt,count=pad_head/(4*6))) # Float size times number of floats
-#   2:
-#;#                dump_dat = np.fromfile(f,dtype=dt,count=pad_head/(4*6)) # Float size times number of floats
-#;#                all_particles_from_file = np.append(all_particles_from_file,dump_dat)
-#   3:
-                    dump_dat.append(np.fromfile(f,dtype=dt,count=pad_head/(4*6))) # Float size times number of floats
-#   end
-                    pad_butt = struct.unpack('<i',f.read(4))
-                    pad_head = struct.unpack('<i',f.read(4))[0]
-                    #print 'Reading Buffer number: '+str(current_sub_buffer)+' Size of next set of bytes: '+str(pad_head)+' !SKIPPED!'
-                    np.fromfile(f,dtype='int64',count=pad_head/(8)) # 1 int8 and we probobly dont need the tag
-                    pad_butt = struct.unpack('<i',f.read(4))
-                # Special Case of the particles left over
-                #   If you are looking hear to figure out an issue it could be that we do not check to make sure that
-                #   this happens in reading the dump file. It is possible that the number of particles excatly fills
-                #   up the buffer and you dont have this extra case. But I dont think this is likly to happen (1/ bufsize)
-                #   First read the number of total particles on this PE, This will tell us how much our next byte size should be
-                #print 'Number of particles in the final buffer: '+str(bufsize_lastcase)
-                #   Next we read the data with the special size. NOTE this could be done in a cleaner way
-                pad_head = struct.unpack('<i',f.read(4))[0]
-                #print 'Reading Buffer number: '+str(number_of_part_on_pe/bufsize+1)+' Size of next set of bytes: '+str(pad_head)
-                temp_dat = np.fromfile(f,dtype=dt,count=pad_head/(4*6)) # Float size times number of floats
-                pad_butt = struct.unpack('<i',f.read(4))[0]
-# Trim all of the extra zeros
-                dump_dat.append(temp_dat[0:bufsize_lastcase])
-# Appending temp dump_dat to all_particles
-                #all_particles_from_file = np.append(all_particles_from_file,dump_dat)
-# Now skip over the tags
-                pad_head = struct.unpack('<i',f.read(4))[0]
-                #print 'Reading Buffer number: '+str(number_of_part_on_pe/bufsize+1)+' Size of next set of bytes: '+str(pad_head)+' !SKIPPED!'
-                np.fromfile(f,dtype='int64',count=pad_head/(8)) # 1 int8 and we probobly dont need the tag
-                pad_butt = struct.unpack('<i',f.read(4))
-                all_sub_species.append(np.concatenate(dump_dat))
-            all_particles.append(all_sub_species)
         return all_particles
 
         def _num_to_ext(num):
