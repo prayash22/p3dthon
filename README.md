@@ -40,6 +40,7 @@ sys.path.append('/glade/u/home/colbyh/pythonprogs/2014.04.p3d_etal/p3dthon/objec
 sys.path.append('/glade/u/home/colbyh/pythonprogs/2014.04.p3d_etal/p3dthon/scripts/')
 from p3d_runs import p3d_run
 #
+But replase the path with your own path to p3dthon
 
 this will let you use p3d_runs right off the bat.
 Good luck!

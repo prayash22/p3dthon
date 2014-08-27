@@ -143,15 +143,21 @@ class p3d_dump(object):
             print 'Note sure about the point of this number? ' +str(struct.unpack('<i',self.open_dump_file.read(4))[0])
             pad_butt = struct.unpack('<i',self.open_dump_file.read(4))
             all_sub_species = []
-            for current_sub_proc in range(self.number_of_pey):
+            for current_sub_proc in range(self.number_of_pey*int(np.round(self.param_dict['nx']/self.param_dict['nchannels']))):
                 pad_head = struct.unpack('<i',self.open_dump_file.read(4))[0]
+                print 'pad_head = '+str(pad_head)
                 number_of_part_on_pe = struct.unpack('<i',self.open_dump_file.read(4))[0]
                 pad_butt = struct.unpack('<i',self.open_dump_file.read(4))
                 dump_dat=[]
                 bufsize_lastcase = number_of_part_on_pe % self.bufsize
                 #c#verboseprint('Reading from proc number: '+str(current_sub_proc)+' Number of part on sub proc: '+str(number_of_part_on_pe))
                 print 'Reading from proc number: '+str(current_sub_proc)+' Number of part on sub proc: '+str(number_of_part_on_pe)
-                for current_sub_buffer in range(number_of_part_on_pe/self.bufsize): 
+                if abs(1.0*number_of_part_on_pe/self.bufsize -  round(number_of_part_on_pe/self.bufsize)) < 1./self.bufsize:
+                    rgn = number_of_part_on_pe/self.bufsize-1
+                else:
+                    rgn = number_of_part_on_pe/self.bufsize
+
+                for current_sub_buffer in range(rgn): 
                     pad_head = struct.unpack('<i',self.open_dump_file.read(4))[0]
                     #print 'Reading Buffer number: '+str(current_sub_buffer)+' Size of next set of bytes: '+str(pad_head)
 # Colby Maybe try switching these two to see if it runs faster. The two should be Equivelent
@@ -164,10 +170,15 @@ class p3d_dump(object):
                     dump_dat.append(np.fromfile(self.open_dump_file,dtype=data_type,count=pad_head/(4*6))) # Float size times number of floats
 #   end
                     pad_butt = struct.unpack('<i',self.open_dump_file.read(4))
-                    pad_head = struct.unpack('<i',self.open_dump_file.read(4))[0]
-                    #print 'Reading Buffer number: '+str(current_sub_buffer)+' Size of next set of bytes: '+str(pad_head)+' !SKIPPED!'
-                    np.fromfile(self.open_dump_file,dtype='int64',count=pad_head/(8)) # 1 int8 and we probobly dont need the tag
-                    pad_butt = struct.unpack('<i',self.open_dump_file.read(4))
+                    #pad_head = struct.unpack('<i',self.open_dump_file.read(4))[0]
+                    #c# pad_head = struct.unpack('<i',self.open_dump_file.read(4))
+                    #c# print 'pad_head = '+str(pad_head)
+                    #c# pad_head = pad_head[0]
+                    #c# #print 'Reading Buffer number: '+str(current_sub_buffer)+' Size of next set of bytes: '+str(pad_head)+' !SKIPPED!'
+                    #c# 
+# I think this run m#c# ight not have any tags
+                    #c# np.fromfile(self.open_dump_file,dtype='int64',count=pad_head/(8)) # 1 int8 and we probobly dont need the tag
+                    #c# pad_butt = struct.unpack('<i',self.open_dump_file.read(4))
                 # Special Case of the particles left over
                 #   If you are looking hear to figure out an issue it could be that we do not check to make sure that
                 #   this happens in reading the dump file. It is possible that the number of particles excatly fills
@@ -184,10 +195,10 @@ class p3d_dump(object):
 # Appending temp dump_dat to all_particles
                 #all_particles_from_file = np.append(all_particles_from_file,dump_dat)
 # Now skip over the tags
-                pad_head = struct.unpack('<i',self.open_dump_file.read(4))[0]
+                #pad_head = struct.unpack('<i',self.open_dump_file.read(4))[0]
                 #print 'Reading Buffer number: '+str(number_of_part_on_pe/bufsize+1)+' Size of next set of bytes: '+str(pad_head)+' !SKIPPED!'
-                np.fromfile(self.open_dump_file,dtype='int64',count=pad_head/(8)) # 1 int8 and we probobly dont need the tag
-                pad_butt = struct.unpack('<i',self.open_dump_file.read(4))
+                #np.fromfile(self.open_dump_file,dtype='int64',count=pad_head/(8)) # 1 int8 and we probobly dont need the tag
+                #pad_butt = struct.unpack('<i',self.open_dump_file.read(4))
                 all_sub_species.append(np.concatenate(dump_dat))
             all_particles[species] = all_sub_species
         return all_particles
@@ -216,7 +227,7 @@ class p3d_dump(object):
         movie_num_int = raw_input()
         return int(movie_num_int)
 
-    def vdist_2d(self,r0=[0.5,0.5],dx=[1.0,1.0],bins=51,species='e',par=False):
+    def vdist_2d(self,r0=[0.5,0.5],dx=[1.0,1.0],bins=51,species='e',par=False,Bvec=False):
         """
         #---------------------------------------------------------------------------------------------------------------
         #   Method      : vdist_2d_par
@@ -242,7 +253,7 @@ class p3d_dump(object):
 
 # Turn this into a method
 #%%%%%%%%%%%%%%%
-        if not hasattr(self,'_r0'):
+        if not hasattr(self,'_r0') or not hasattr(self,'particles'):
             self._r0 = r0
             self._dx = dx
 # Calling get particles in box to make the vdist
@@ -259,27 +270,35 @@ class p3d_dump(object):
 #%%%%%%%%%%%%%%%
 
 # Reading in fields to calculate vpar
-        print 'Reading in the Fields form the Dump File'
-        dump_field_dict = self.read_dump_file(fields=True)
 # Now there are two ways to do this, a faster and a slower
 # Faster: just take the average B field and and use that
 #         for every particle
 # Slower: Use an interpolated Bfield for each point
 #
 # Right now im only coding the faster one
-        if par:
-            return_hist = self._vdist_2d_par(bins)
+        if par or Bvec:
+            print 'Reading in the Fields form the Dump File'
+            self.dump_field_dict = self.read_dump_file(fields=True)
+            if par:
+                return_hist = self._vdist_2d_par(bins)
+            else:
+                return_hist = self._vdist_2d(bins)
+                print 'Interpolating the Bfield at the given r0 value'
+                return_hist['B'] = np.array([self.interp_field(self.dump_field_dict['bx']), \
+                                             self.interp_field(self.dump_field_dict['by']), \
+                                             self.interp_field(self.dump_field_dict['bz'])])
         else:
             return_hist = self._vdist_2d(bins)
+
         return return_hist
 
 
     def _vdist_2d_par(self,bins):
         print 'Calculating B field'
         
-        bx_interp = self.interp_field(dump_field_dict['bx'],self.param_dict['lx'],self.param_dict['ly'],self.r0[0],self.r0[1])
-        by_interp = self.interp_field(dump_field_dict['by'],self.param_dict['lx'],self.param_dict['ly'],self.r0[0],self.r0[1])
-        bz_interp = self.interp_field(dump_field_dict['bz'],self.param_dict['lx'],self.param_dict['ly'],self.r0[0],self.r0[1])
+        bx_interp = self.interp_field(self.dump_field_dict['bx'],self.param_dict['lx'],self.param_dict['ly'],self._r0[0],self._r0[1])
+        by_interp = self.interp_field(self.dump_field_dict['by'],self.param_dict['lx'],self.param_dict['ly'],self._r0[0],self._r0[1])
+        bz_interp = self.interp_field(self.dump_field_dict['bz'],self.param_dict['lx'],self.param_dict['ly'],self._r0[0],self._r0[1])
         bmag_interp = (bx_interp**2+by_interp**2+bz_interp**2)**.5
 
         if by_interp > 0.:
@@ -402,10 +421,10 @@ class p3d_dump(object):
         yub = y0 + dy/2.
 
 # BIGNOTE: This seems iffy you should come back and double check this colby. It doesnt make sence that we should have to add 1
-        xproc_lb = int(np.floor(1.0*self.param_dict['pex']*xlb/self.param_dict['lx']))+1
-        yproc_lb = int(np.floor(1.0*self.param_dict['pey']*ylb/self.param_dict['ly']))
-        xproc_ub = int(np.floor(1.0*self.param_dict['pex']*xub/self.param_dict['lx']))+1
-        yproc_ub = int(np.floor(1.0*self.param_dict['pey']*yub/self.param_dict['ly']))
+        xproc_lb = (int(np.floor(1.0*self.param_dict['pex']*xlb/self.param_dict['lx']))+1)%self.param_dict['nchannels']
+        yproc_lb = int(np.floor(1.0*self.param_dict['pey']*ylb/self.param_dict['ly']))*2
+        xproc_ub = (int(np.floor(1.0*self.param_dict['pex']*xub/self.param_dict['lx']))+1)%self.param_dict['nchannels']
+        yproc_ub = int(np.floor(1.0*self.param_dict['pey']*yub/self.param_dict['ly']))*2
 
         if xproc_lb > xproc_ub:
             print 'Lower Bound greater than upper bound! That is obviously an issue!'
@@ -416,8 +435,8 @@ class p3d_dump(object):
         
         print 'The x processors we will be loading (i.e. the dump files) are: {}'.format(xprocs_2load)
         print 'The y processors we will be loading (i.e. the sub arrays) are: {}'.format(yprocs_2load)
-        print 'That means we have {} processors to load and you can expect an aprox. {:.2f} min wait time'.format(
-              len(xprocs_2load)*len(yprocs_2load),1.41*len(xprocs_2load)*len(yprocs_2load)*4./60.)
+        #c# print 'That means we have {} processors to load and you can expect an aprox. {:.2f} min wait time'.format(
+        #c#      len(xprocs_2load)*len(yprocs_2load),1.41*len(xprocs_2load)*len(yprocs_2load)*4./60.)
 
 # Load in the appropriate Processors
         temp_dump_pruned = {}# List to hold all the particles
@@ -429,6 +448,18 @@ class p3d_dump(object):
             dump_index = self._num_to_ext(xprocs_index)
             print 'Loading in xproc number '+dump_index
             temp_dump_dat = self.read_dump_file(dump_index)
+
+            #c# new_tdd = {}
+# We need to#c#  throw out the extra data
+            #c# if (int(np.floor(1.0*self.param_dict['pex']*xlb/self.param_dict['lx']))+1)/self.param_dict['nchannels'] < 1:
+            #c#     new_tdd['i'] = temp_dump_dat['i'][:len(temp_dump_dat['i'])/2-1]
+            #c#     new_tdd['e'] = temp_dump_dat['e'][:len(temp_dump_dat['e'])/2-1]
+            #c# else:
+            #c#     new_tdd['i'] = temp_dump_dat['i'][len(temp_dump_dat['i'])/2:]
+            #c#     new_tdd['e'] = temp_dump_dat['e'][len(temp_dump_dat['e'])/2:]
+
+            #c# temp_dump_dat = new_tdd
+
 
 # We need to looop over Ions and Electrons
             for species in self.species:
@@ -846,7 +877,7 @@ class p3d_dump(object):
                 return '00'+str(num)
 
 
-    def interp_field(self,field,lx,ly,xpoint,ypoint):
+    def interp_field(self,field,lx='not_set',ly='not_set',r0='not_set'):
         """
 #---------------------------------------------------------------------------------------------------------------
 #   Method      : interp_field
@@ -855,19 +886,23 @@ class p3d_dump(object):
 #               : between the grid points
 #
 #   Args        : field  The field you are interpolating
-#               : xpoint The xpoint to interpolate at
-#               : ypoint The ypoint to interpolate at
+#               : r0[0] The xpoint to interpolate at
+#               : r0[1] The ypoint to interpolate at
 #
 #   Comments    : I think this is working ok? It would be smart to make this an object method that just reads
 #               : the internally saved field. so CODE IN THE FUTURE
 #---------------------------------------------------------------------------------------------------------------
         """
+        if lx=='not_set':lx=self.param_dict['lx']
+        if ly=='not_set':ly=self.param_dict['ly']
+        if r0=='not_set':r0=self._r0
+
         nx = len(field[0,:])
         ny = len(field[:,0])
-        ip = int(np.floor(1.0*xpoint/lx*nx))
-        jp = int(np.floor(1.0*ypoint/ly*ny))
-        weight_x = 1.0*xpoint/lx*nx - np.floor(1.0*xpoint/lx*nx)
-        weight_y = 1.0*ypoint/ly*ny - np.floor(1.0*ypoint/ly*ny)
+        ip = int(np.floor(1.0*r0[0]/lx*nx))
+        jp = int(np.floor(1.0*r0[1]/ly*ny))
+        weight_x = 1.0*r0[0]/lx*nx - np.floor(1.0*r0[0]/lx*nx)
+        weight_y = 1.0*r0[1]/ly*ny - np.floor(1.0*r0[1]/ly*ny)
         return np.array([(1.-weight_x)*(1.-weight_y)*field[jp,ip] + (weight_x)*(1.-weight_y)*field[jp+1,ip] \
                + (1.-weight_x)*(weight_y)*field[jp,ip+1]+ (weight_x)*(weight_y)*field[jp+1,ip+1]])
     
