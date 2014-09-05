@@ -143,9 +143,10 @@ class p3d_dump(object):
             print 'Note sure about the point of this number? ' +str(struct.unpack('<i',self.open_dump_file.read(4))[0])
             pad_butt = struct.unpack('<i',self.open_dump_file.read(4))
             all_sub_species = []
-            for current_sub_proc in range(self.number_of_pey*int(np.round(self.param_dict['nx']/self.param_dict['nchannels']))):
+
+            for current_sub_proc in range(self.number_of_pey*int(np.round(self.param_dict['pex']/self.param_dict['nchannels']))):
                 pad_head = struct.unpack('<i',self.open_dump_file.read(4))[0]
-                print 'pad_head = '+str(pad_head)
+                #print 'pad_head = '+str(pad_head)
                 number_of_part_on_pe = struct.unpack('<i',self.open_dump_file.read(4))[0]
                 pad_butt = struct.unpack('<i',self.open_dump_file.read(4))
                 dump_dat=[]
@@ -156,7 +157,6 @@ class p3d_dump(object):
                     rgn = number_of_part_on_pe/self.bufsize-1
                 else:
                     rgn = number_of_part_on_pe/self.bufsize
-
                 for current_sub_buffer in range(rgn): 
                     pad_head = struct.unpack('<i',self.open_dump_file.read(4))[0]
                     #print 'Reading Buffer number: '+str(current_sub_buffer)+' Size of next set of bytes: '+str(pad_head)
@@ -171,14 +171,14 @@ class p3d_dump(object):
 #   end
                     pad_butt = struct.unpack('<i',self.open_dump_file.read(4))
                     #pad_head = struct.unpack('<i',self.open_dump_file.read(4))[0]
-                    #c# pad_head = struct.unpack('<i',self.open_dump_file.read(4))
-                    #c# print 'pad_head = '+str(pad_head)
-                    #c# pad_head = pad_head[0]
-                    #c# #print 'Reading Buffer number: '+str(current_sub_buffer)+' Size of next set of bytes: '+str(pad_head)+' !SKIPPED!'
-                    #c# 
-# I think this run m#c# ight not have any tags
-                    #c# np.fromfile(self.open_dump_file,dtype='int64',count=pad_head/(8)) # 1 int8 and we probobly dont need the tag
-                    #c# pad_butt = struct.unpack('<i',self.open_dump_file.read(4))
+                    pad_head = struct.unpack('<i',self.open_dump_file.read(4))
+                    #print 'pad_head = '+str(pad_head)
+                    pad_head = pad_head[0]
+                    #print 'Reading Buffer number: '+str(current_sub_buffer)+' Size of next set of bytes: '+str(pad_head)+' !SKIPPED!'
+                    
+# I think this run might not have any tags
+                    np.fromfile(self.open_dump_file,dtype='int64',count=pad_head/(8)) # 1 int8 and we probobly dont need the tag
+                    pad_butt = struct.unpack('<i',self.open_dump_file.read(4))
                 # Special Case of the particles left over
                 #   If you are looking hear to figure out an issue it could be that we do not check to make sure that
                 #   this happens in reading the dump file. It is possible that the number of particles excatly fills
@@ -195,10 +195,10 @@ class p3d_dump(object):
 # Appending temp dump_dat to all_particles
                 #all_particles_from_file = np.append(all_particles_from_file,dump_dat)
 # Now skip over the tags
-                #pad_head = struct.unpack('<i',self.open_dump_file.read(4))[0]
+                pad_head = struct.unpack('<i',self.open_dump_file.read(4))[0]
                 #print 'Reading Buffer number: '+str(number_of_part_on_pe/bufsize+1)+' Size of next set of bytes: '+str(pad_head)+' !SKIPPED!'
-                #np.fromfile(self.open_dump_file,dtype='int64',count=pad_head/(8)) # 1 int8 and we probobly dont need the tag
-                #pad_butt = struct.unpack('<i',self.open_dump_file.read(4))
+                np.fromfile(self.open_dump_file,dtype='int64',count=pad_head/(8)) # 1 int8 and we probobly dont need the tag
+                pad_butt = struct.unpack('<i',self.open_dump_file.read(4))
                 all_sub_species.append(np.concatenate(dump_dat))
             all_particles[species] = all_sub_species
         return all_particles
@@ -421,14 +421,28 @@ class p3d_dump(object):
         yub = y0 + dy/2.
 
 # BIGNOTE: This seems iffy you should come back and double check this colby. It doesnt make sence that we should have to add 1
+        #xproc_lb = (int(np.floor(1.0*self.param_dict['pex']*xlb/self.param_dict['lx']))+1)%int(self.param_dict['nchannels'])
+        #xproc_lb = (int(np.floor(1.0*self.param_dict['pex']*xlb/self.param_dict['lx']))+1)%int(self.param_dict['nchannels'])
+        if type(self.param_dict['nchannels']) == str:
+# Man you should fix this colby!!!
+            self.param_dict['nchannels'] =  self.param_dict['pex']
+
+        print 'oioioioiooioiooioiio ylb = %s yub = %s '%(ylb,yub)
         xproc_lb = (int(np.floor(1.0*self.param_dict['pex']*xlb/self.param_dict['lx']))+1)%self.param_dict['nchannels']
-        yproc_lb = int(np.floor(1.0*self.param_dict['pey']*ylb/self.param_dict['ly']))*2
+# Colby this needs to be cooded better!!!
+# if you have a diffent number of channels than pex you run into some shit
+        yproc_lb = int(np.floor(1.0*self.param_dict['pey']*ylb/self.param_dict['ly']))
+        #yproc_lb = int(np.floor(1.0*self.param_dict['pey']*ylb/self.param_dict['ly']))*2 #Uncomment for yishin
+        #xproc_ub = (int(np.floor(1.0*self.param_dict['pex']*xub/self.param_dict['lx']))+1)%int(self.param_dict['nchannels'])
         xproc_ub = (int(np.floor(1.0*self.param_dict['pex']*xub/self.param_dict['lx']))+1)%self.param_dict['nchannels']
-        yproc_ub = int(np.floor(1.0*self.param_dict['pey']*yub/self.param_dict['ly']))*2
+        yproc_ub = int(np.floor(1.0*self.param_dict['pey']*yub/self.param_dict['ly'])) 
+        #yproc_ub = int(np.floor(1.0*self.param_dict['pey']*yub/self.param_dict['ly']))*2 #Uncomment for yishin
 
         if xproc_lb > xproc_ub:
             print 'Lower Bound greater than upper bound! That is obviously an issue!'
             return -1
+
+        print 'oioioioiooioiooioiio ylp = %s yup = %s '%(yproc_lb,yproc_ub)
 
         xprocs_2load = range(xproc_lb,xproc_ub+1)
         yprocs_2load = range(yproc_lb,yproc_ub+1)

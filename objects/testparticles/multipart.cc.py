@@ -33,7 +33,7 @@ class TPRun:
                  v0=[0.,0.,0.],
                  dv0=[0.1,0.1],
                  dt=.001,
-                 loading     = '',     #randu,randn,copy
+                 loading     = 'randu',     #randu,randn,copy
                  fieldinterp = False):
 
         """ constructor of the testparticle run object
