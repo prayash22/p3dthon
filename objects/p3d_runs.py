@@ -72,7 +72,16 @@ class p3d_run(object):
         11:21:19.671182
         """
         if len(runname) == 0: # Start init prompt
-            runname = raw_input('Please enter the runname (enter local to not save/load data): ') 
+            runname = raw_input("Please enter the runname (or 'help' for other options): ") 
+
+        if runname.lower() == 'help' :
+            print "\n 'local' or ''  : To use local parameters (i.e. enter every thing in now and it will be erased after)"
+            print " 'print' or 'p' : To print all of the stored runs names\n"
+            runname = raw_input("Please enter the runname: ")
+
+        if runname.lower() == 'print' or runname.lower() == 'p' :
+            self._print_runnames()
+            runname = raw_input("Please enter the runname: ")
 
         if runname.lower() == 'local' or runname == '':
             print 'No run info chosen, using local parameters.'
@@ -80,7 +89,6 @@ class p3d_run(object):
         else:
             print "Using run %s for the run.info run name."%runname
             self._init_file(runname)
-
 
     def _init_file(self,runname):
         """ Initilazition Routine for the p3d_run object that saves the runs information
@@ -125,6 +133,16 @@ class p3d_run(object):
 ########################################################################################################################################################
 #       Begin:                                   Creating and maintaining the run.info file                                                            #
 ########################################################################################################################################################
+
+    def _print_runnames(self):
+        print 'Printing all runnames:'
+        for cosa in os.listdir(P3DTHON_PATH+'p3dthon/run_info/'):
+            if cosa[0] != '.':
+                print '\t'+cosa[:cosa.rfind('.')]
+        print ''
+
+
+
 
     def load_info_file(self):
         """ Class Method: uses preset file name for run info file and gets all items
