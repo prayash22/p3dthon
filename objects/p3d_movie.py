@@ -161,15 +161,20 @@ class p3d_movie(object):
                 dat_type = 'int16'
                 norm_cst = 256**2-1
             else: #single byte precision
-                dat_type = 'int8'
+                #dat_type = 'int8'
+                dat_type = 'uint8'
                 norm_cst = 256-1
 
             print 'dat_type = ',dat_type
 
             fp = np.memmap(fname, dtype=dat_type, mode='r',shape=(self.num_of_times,ney,nex)) 
+            self.debut_temp0 = fp
             byte_arr = np.frombuffer(fp[time],dtype=dat_type)
-            byte_arr = byte_arr.reshape(ney,nex).transpose()
+            # converting into a float
+            self.debug_temp1 = byte_arr
+            byte_arr = 1.0*byte_arr.reshape(ney,nex).transpose()
 
+            self.debug_temp2 = byte_arr
 # This seems to be working but we need to generalize for any file
 # Also It would be good to have some kinda of print out talkting about
 # How many movies there are and all that non sence.
@@ -178,13 +183,14 @@ class p3d_movie(object):
             lmin = np.array(self.movie_log_dict[cosa])[:,0]
             lmax = np.array(self.movie_log_dict[cosa])[:,1]
 
+            self.debug_temp3 = [lmin,lmax]
             #byte_ip1 = movie_time*arr_size[0]*arr_size[1]
             #byte_ip2 = byte_ip1 + arr_size[0]*arr_size[1]
 
             #print 'There are '+str(len(byte_movie)/arr_size[0]/arr_size[1])+ \
             #' movie files and you loaded number ' +str(movie_time+1)
 
-            return_dict[cosa] = byte_arr*(lmax[time]-lmin[time])*1.0/norm_cst + lmin[time]
+            return_dict[cosa] = 1.0*byte_arr*(lmax[time]-lmin[time])/norm_cst + 1.0*lmin[time]
 
 
         #return real_arr_1.reshape(arr_size[1],arr_size[0])
