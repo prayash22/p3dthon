@@ -140,7 +140,9 @@ class p3d_dump(object):
         for species in ['i','e']: 
             pad_head = struct.unpack('<i',self.open_dump_file.read(4))[0]
             #c#verboseprint('Note sure about the point of this number? ' +str(struct.unpack('<i',self.open_dump_file.read(4))[0]))
-            print 'Note sure about the point of this number? ' +str(struct.unpack('<i',self.open_dump_file.read(4))[0])
+            #print 'Note sure about the point of this number? ' +str(struct.unpack('<i',self.open_dump_file.read(4))[0])
+            str(struct.unpack('<i',self.open_dump_file.read(4))[0]) # I think you need this comand so that it will
+                                                                    # unpack what ever this value is
             pad_butt = struct.unpack('<i',self.open_dump_file.read(4))
             all_sub_species = []
 
@@ -152,7 +154,7 @@ class p3d_dump(object):
                 dump_dat=[]
                 bufsize_lastcase = number_of_part_on_pe % self.bufsize
                 #c#verboseprint('Reading from proc number: '+str(current_sub_proc)+' Number of part on sub proc: '+str(number_of_part_on_pe))
-                print 'Reading from proc number: '+str(current_sub_proc)+' Number of part on sub proc: '+str(number_of_part_on_pe)
+                #print 'Reading from proc number: '+str(current_sub_proc)+' Number of part on sub proc: '+str(number_of_part_on_pe)
                 if abs(1.0*number_of_part_on_pe/self.bufsize -  round(number_of_part_on_pe/self.bufsize)) < 1./self.bufsize:
                     rgn = number_of_part_on_pe/self.bufsize-1
                 else:
@@ -260,8 +262,12 @@ class p3d_dump(object):
             print 'Reading Ions and Electrons from the Dump File'
             self.particles = self._part_in_box(r0,dx)
         else:
-            if (self._r0 == r0) and (self._dx == dx):
-                print 'Same r0 and dx found, using old particles'
+            if (self._r0[0] == r0[0]) and (self._r0[1] == r0[1]) and (self._dx == dx):
+                print '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
+                print '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Same r0 and dx found, using old particles ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
+                print 'r0 = '+str(r0)+' _r0 = '+str(self._r0)
+                print '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
+                print '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
             else:
                 self._r0 = r0
                 self._dx = dx
@@ -295,10 +301,13 @@ class p3d_dump(object):
 
     def _vdist_2d_par(self,bins):
         print 'Calculating B field'
-        
-        bx_interp = self.interp_field(self.dump_field_dict['bx'],self.param_dict['lx'],self.param_dict['ly'],self._r0[0],self._r0[1])
-        by_interp = self.interp_field(self.dump_field_dict['by'],self.param_dict['lx'],self.param_dict['ly'],self._r0[0],self._r0[1])
-        bz_interp = self.interp_field(self.dump_field_dict['bz'],self.param_dict['lx'],self.param_dict['ly'],self._r0[0],self._r0[1])
+        # this version doent work 
+        #bx_interp = self.interp_field(self.dump_field_dict['bx'],self.param_dict['lx'],self.param_dict['ly'],self._r0[0],self._r0[1])
+        #by_interp = self.interp_field(self.dump_field_dict['by'],self.param_dict['lx'],self.param_dict['ly'],self._r0[0],self._r0[1])
+        #bz_interp = self.interp_field(self.dump_field_dict['bz'],self.param_dict['lx'],self.param_dict['ly'],self._r0[0],self._r0[1])
+        bx_interp = self.interp_field(self.dump_field_dict['bx'],self.param_dict['lx'],self.param_dict['ly'],self._r0)
+        by_interp = self.interp_field(self.dump_field_dict['by'],self.param_dict['lx'],self.param_dict['ly'],self._r0)
+        bz_interp = self.interp_field(self.dump_field_dict['bz'],self.param_dict['lx'],self.param_dict['ly'],self._r0)
         bmag_interp = (bx_interp**2+by_interp**2+bz_interp**2)**.5
 
         if by_interp > 0.:
@@ -310,6 +319,11 @@ class p3d_dump(object):
             b_perp1y = bz_interp/(bz_interp**2 + by_interp**2)**(.5)
             b_perp1z = -1.*by_interp/(bx_interp**2 + by_interp**2)**(.5)
 
+        b_perpmag = (b_perp1x**2+b_perp1y**2+b_perp1z**2)**.5
+        b_perp1x = b_perp1x/b_perpmag
+        b_perp1y = b_perp1y/b_perpmag
+        b_perp1z = b_perp1z/b_perpmag
+
         b_perp2x = (by_interp*b_perp1z - bz_interp*b_perp1y)
         b_perp2y = (bz_interp*b_perp1x - bx_interp*b_perp1z)
         b_perp2z = (bx_interp*b_perp1y - by_interp*b_perp1x)
@@ -317,6 +331,14 @@ class p3d_dump(object):
         b_perp2x = b_perp2x/b_perpmag
         b_perp2y = b_perp2y/b_perpmag
         b_perp2z = b_perp2z/b_perpmag
+
+        print '%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%'
+        print '%%%%%%%%%%%%%%%%%%%%%%%%%%% DEBUG %%%%%%%%%%%%%%%%%%%%%%%%%%%'
+        print 'bx,by,bz = %1.2f, %1.2f, %1.2f'%(bx_interp,by_interp,bz_interp)
+        print '1x,1y,1z = %1.2f, %1.2f, %1.2f'%(b_perp1x,b_perp1y,b_perp1z)
+        print '2x,2y,2z = %1.2f, %1.2f, %1.2f'%(b_perp2x,b_perp2y,b_perp2z)
+        print '%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%'
+        print '%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%'
 
         print 'Rotating Velocties'
         velo = {'i':{},'e':{}}

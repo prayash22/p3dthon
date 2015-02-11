@@ -1,4 +1,6 @@
 import numpy as np
+import matplotlib.pyplot as plt
+from scipy.io.idl import readsav
 
 def set_local(IDL_restore,lcl):
     #lcl = locals()
@@ -44,4 +46,20 @@ def TestTen(var,lcl,av=''):
         return True
     else: 
         return False
+
+def ims(fdic,key,ax='not_set',**kwargs):
+    if ax == 'not_set':
+        ax = plt.gca()
+
+    if not kwargs.has_key('cmap'):
+        return_ims = ax.imshow(fdic[key],origin='low',extent=[fdic['xx'][0],fdic['xx'][-1],fdic['yy'][0],fdic['yy'][-1]],cmap='PuOr',**kwargs)
+    else:
+        return_ims = ax.imshow(fdic[key],origin='low',extent=[fdic['xx'][0],fdic['xx'][-1],fdic['yy'][0],fdic['yy'][-1]],**kwargs)
+    plt.draw()
+    return return_ims
+
+
+def read_movie(**kwargs):
+    print 'not coded yet...'
+
 
