@@ -158,7 +158,7 @@ class p3d_movie(object):
             print "Restoring Varible '"+cosa+"' From File '"+fname+"'"
 
             if 'double_byte' in self.param_dict:
-                dat_type = 'int16'
+                dat_type = 'uint16'
                 norm_cst = 256**2-1
             else: #single byte precision
                 #dat_type = 'int8'
