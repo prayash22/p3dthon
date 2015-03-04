@@ -199,6 +199,7 @@ class p3d_movie(object):
         if np.size(return_dict.keys()) == 1:
             return return_dict[return_dict.keys()[0]]
         elif np.size(return_dict.keys()) > 1: 
+            (return_dict['xx'],return_dict['yy']) = self.get_domain_arrays()
             return return_dict
         else:
             print 'I dont know why the return_dict in this method (load_movie) is empty?'
@@ -257,6 +258,16 @@ class p3d_movie(object):
             print '!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!!@!@!@!@!@!@!@!@!@!@!@!@!@!@@!@!@!@!@!@!@!@!@!@!@!@!@!@'
             print 'This particular moive headder has not been coded! Fix it or talk to colby, or fix it yourself I dont care, Im a computer not a cop'
             print '!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@!@'
+
+    def get_domain_arrays(self):
+        lx = self.param_dict['lx']
+        ly = self.param_dict['ly']
+        nx = self.param_dict['pex']*self.param_dict['nx']
+        ny = self.param_dict['pey']*self.param_dict['ny']
+        dx = lx/nx
+        dy = ly/ny
+        return (np.arange(dx/2.,lx,dx),np.arange(dy/2.,ly,dy))
+        
         
     def rotate_temp(self,Te):
         print 'Not Rotating Temperature'

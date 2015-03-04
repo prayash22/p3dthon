@@ -47,14 +47,23 @@ def TestTen(var,lcl,av=''):
     else: 
         return False
 
-def ims(fdic,key,ax='not_set',**kwargs):
+###
+### A wrapper function for imshow to do most tedious stuff for my simulations
+###
+def ims(fdic,key,ax='not_set',ordflg='idl',**kwargs):
+
     if ax == 'not_set':
         ax = plt.gca()
 
-    if not kwargs.has_key('cmap'):
-        return_ims = ax.imshow(fdic[key],origin='low',extent=[fdic['xx'][0],fdic['xx'][-1],fdic['yy'][0],fdic['yy'][-1]],cmap='PuOr',**kwargs)
+    if ordflg == 'idl':
+        plt_val = fdic[key]
     else:
-        return_ims = ax.imshow(fdic[key],origin='low',extent=[fdic['xx'][0],fdic['xx'][-1],fdic['yy'][0],fdic['yy'][-1]],**kwargs)
+        plt_val = fdic[key].T
+
+    if not kwargs.has_key('cmap'):
+        return_ims = ax.imshow(plt_val,origin='low',extent=[fdic['xx'][0],fdic['xx'][-1],fdic['yy'][0],fdic['yy'][-1]],cmap='PuOr',**kwargs)
+    else:
+        return_ims = ax.imshow(plt_val,origin='low',extent=[fdic['xx'][0],fdic['xx'][-1],fdic['yy'][0],fdic['yy'][-1]],**kwargs)
     plt.draw()
     return return_ims
 
