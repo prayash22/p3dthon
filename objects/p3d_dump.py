@@ -16,6 +16,7 @@
 #
 
 import os
+import sys 
 import datetime
 import numpy as np
 import struct
@@ -44,13 +45,15 @@ class p3d_dump(object):
         11:21:19.671182
         """
         self._set_local_flag = False
-        self.species = ['i','e'] #all species contained within dump files. will need to recode for multi species
 
         if dump_path.strip()[-1] == '/': self.dump_path = dump_path[:-1].strip()
         else: self.dump_path = dump_path
         self.param_dict = param_dict
         if dump_num < 0: dump_num = self._dump_num_options()
         self.dump_num = self._num_to_ext(dump_num) # Code _movie_num_opt
+
+        if 'stat_ions' in self.param_dict: self.species = ['i','e'] 
+        else: self.species = ['i','e'] #all species contained within dump files. will need to recode for multi species
 
 
 
@@ -75,7 +78,7 @@ class p3d_dump(object):
 
         dump_index = self._num_to_ext(dump_index)
         fname = '%s/p3d-%s.%s'%(self.dump_path,dump_index,self.dump_num)
-        print 'fname = '+fname
+        #qc#print 'fle name = '+fname
 
 # Make sure that the file exsists and suguset alternetives to fix it
         try:
@@ -104,7 +107,7 @@ class p3d_dump(object):
 
 
     def _get_fields(self):
-        print 'Reading fields: ex, ey, ez, bx, by, bz'
+        #qc#print 'Reading fields: ex, ey, ez, bx, by, bz'
         self.dump_field_dict={}
         for field_var in ['ex','ey','ez','bx','by','bz']:
             dump_dat=[]
@@ -120,33 +123,41 @@ class p3d_dump(object):
 # Like they do in p3d
 
     def _pad_headder(self):
-        print "Reading Header from dump file"
+        #qc#print "Reading Header from dump file"
         header_chunksize=44 # Size of the header in bytes
         header_binary = self.open_dump_file.read(header_chunksize)
+        #if sys.byteorder == 'little': ic = '<' # Littel Endian (do I even need to do this?) 
+        #else ic = '>' # Big Endian
         header = struct.unpack('<idd6i', header_binary) #Int, Double Double, 6 Ints
-        print "              : "+str(header)
+        #qc#print "              : "+str(header)
+        self.time = header[1]
+        self.n_avg = header[2]
         self.px = header[3]
         self.py = header[4]
-        self.bufsize = header[-3]
-        self.number_of_pey = header[-2]
-        print 'bufsize = '+str(self.bufsize)
-        print 'px = '+str(self.px)
-        print 'py = '+str(self.py)
+        self.pz = header[5]
+        self.bufsize = header[6]
+        self.nchannels = header[7]
+        #qc#print 'time = %f'%(self.time)
+        #qc#print 'n_avg = %f'%(self.n_avg)
+        #qc#print 'px =  %i, %i'%(self.px,self.param_dict['nx']*self.param_dict['pex'])
+        #qc#print 'py =  %i, %i'%(self.py,self.param_dict['ny']*self.param_dict['pey'])
+        #qc#print 'pz =  %i, %i'%(self.pz,self.param_dict['nz']*self.param_dict['pez'])
+        #qc#print 'bufsize = %i, %i'%(self.bufsize, self.param_dict['bufsize'])
+        #qc#print 'nchannels = %i, %i\n'%(self.nchannels, self.param_dict['nchannels'])
 
     def _get_particles(self):
         data_type = np.dtype([('x', 'float32'), ('y', 'float32'), ('z', 'float32'),('vx', 'float32'), ('vy', 'float32'), ('vz', 'float32')])
         #all_particles = [] 
         all_particles = {} 
-        for species in ['i','e']: 
+        for species in self.species: 
             pad_head = struct.unpack('<i',self.open_dump_file.read(4))[0]
             #c#verboseprint('Note sure about the point of this number? ' +str(struct.unpack('<i',self.open_dump_file.read(4))[0]))
-            #print 'Note sure about the point of this number? ' +str(struct.unpack('<i',self.open_dump_file.read(4))[0])
+            #print 'Not sure about the point of this number? ' +str(struct.unpack('<i',self.open_dump_file.read(4))[0])
             str(struct.unpack('<i',self.open_dump_file.read(4))[0]) # I think you need this comand so that it will
                                                                     # unpack what ever this value is
             pad_butt = struct.unpack('<i',self.open_dump_file.read(4))
             all_sub_species = []
-
-            for current_sub_proc in range(self.number_of_pey*int(np.round(self.param_dict['pex']/self.param_dict['nchannels']))):
+            for current_sub_proc in range(self.param_dict['pey']*int(np.round(self.param_dict['pex']/self.param_dict['nchannels']))): 
                 pad_head = struct.unpack('<i',self.open_dump_file.read(4))[0]
                 #print 'pad_head = '+str(pad_head)
                 number_of_part_on_pe = struct.unpack('<i',self.open_dump_file.read(4))[0]
@@ -154,7 +165,7 @@ class p3d_dump(object):
                 dump_dat=[]
                 bufsize_lastcase = number_of_part_on_pe % self.bufsize
                 #c#verboseprint('Reading from proc number: '+str(current_sub_proc)+' Number of part on sub proc: '+str(number_of_part_on_pe))
-                #print 'Reading from proc number: '+str(current_sub_proc)+' Number of part on sub proc: '+str(number_of_part_on_pe)
+                #vbct# print 'Reading from proc number: '+str(current_sub_proc)+' Number of part on sub proc: '+str(number_of_part_on_pe)
                 if abs(1.0*number_of_part_on_pe/self.bufsize -  round(number_of_part_on_pe/self.bufsize)) < 1./self.bufsize:
                     rgn = number_of_part_on_pe/self.bufsize-1
                 else:
@@ -229,7 +240,7 @@ class p3d_dump(object):
         movie_num_int = raw_input()
         return int(movie_num_int)
 
-    def vdist_2d(self,r0=[0.5,0.5],dx=[1.0,1.0],bins=51,species='e',par=False,Bvec=False):
+    def vdist_2d(self,r0=[0.5,0.5],dx=[1.0,1.0],species='e',par=False,Bvec=False,OneD=False,**kwargs):
         """
         #---------------------------------------------------------------------------------------------------------------
         #   Method      : vdist_2d_par
@@ -255,11 +266,14 @@ class p3d_dump(object):
 
 # Turn this into a method
 #%%%%%%%%%%%%%%%
+        if OneD: # Make dy = ly
+            r0[1] = self.param_dict['ly']/2.0
+            dx = [dx[0], self.param_dict['ly']/2.0]
         if not hasattr(self,'_r0') or not hasattr(self,'particles'):
             self._r0 = r0
             self._dx = dx
 # Calling get particles in box to make the vdist
-            print 'Reading Ions and Electrons from the Dump File'
+            #qc#print 'Reading Ions and Electrons from the Dump File'
             self.particles = self._part_in_box(r0,dx)
         else:
             if (self._r0[0] == r0[0]) and (self._r0[1] == r0[1]) and (self._dx == dx):
@@ -271,7 +285,7 @@ class p3d_dump(object):
             else:
                 self._r0 = r0
                 self._dx = dx
-                print 'Reading Ions and Electrons from the Dump File'
+                #qc#print 'Reading Ions and Electrons from the Dump File'
                 self.particles = self._part_in_box(r0,dx)
 #%%%%%%%%%%%%%%%
 
@@ -282,25 +296,26 @@ class p3d_dump(object):
 # Slower: Use an interpolated Bfield for each point
 #
 # Right now im only coding the faster one
+        if not kwargs.has_key('bins'): kwargs['bins']=51
         if par or Bvec:
-            print 'Reading in the Fields form the Dump File'
+            #qc#print 'Reading in the Fields form the Dump File'
             self.dump_field_dict = self.read_dump_file(fields=True)
             if par:
-                return_hist = self._vdist_2d_par(bins)
+                return_hist = self._vdist_2d_par(**kwargs)
             else:
-                return_hist = self._vdist_2d(bins)
-                print 'Interpolating the Bfield at the given r0 value'
+                return_hist = self._vdist_2d(**kwargs)
+                #qc#print 'Interpolating the Bfield at the given r0 value'
                 return_hist['B'] = np.array([self.interp_field(self.dump_field_dict['bx']), \
                                              self.interp_field(self.dump_field_dict['by']), \
                                              self.interp_field(self.dump_field_dict['bz'])])
         else:
-            return_hist = self._vdist_2d(bins)
+            return_hist = self._vdist_2d(**kwargs)
 
         return return_hist
 
 
-    def _vdist_2d_par(self,bins):
-        print 'Calculating B field'
+    def _vdist_2d_par(self,**kwargs):
+        #qc#print 'Calculating B field'
         # this version doent work 
         #bx_interp = self.interp_field(self.dump_field_dict['bx'],self.param_dict['lx'],self.param_dict['ly'],self._r0[0],self._r0[1])
         #by_interp = self.interp_field(self.dump_field_dict['by'],self.param_dict['lx'],self.param_dict['ly'],self._r0[0],self._r0[1])
@@ -332,43 +347,56 @@ class p3d_dump(object):
         b_perp2y = b_perp2y/b_perpmag
         b_perp2z = b_perp2z/b_perpmag
 
-        print '%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%'
-        print '%%%%%%%%%%%%%%%%%%%%%%%%%%% DEBUG %%%%%%%%%%%%%%%%%%%%%%%%%%%'
-        print 'bx,by,bz = %1.2f, %1.2f, %1.2f'%(bx_interp,by_interp,bz_interp)
-        print '1x,1y,1z = %1.2f, %1.2f, %1.2f'%(b_perp1x,b_perp1y,b_perp1z)
-        print '2x,2y,2z = %1.2f, %1.2f, %1.2f'%(b_perp2x,b_perp2y,b_perp2z)
-        print '%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%'
-        print '%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%'
+        #print '%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%'
+        #print '%%%%%%%%%%%%%%%%%%%%%%%%%%% DEBUG %%%%%%%%%%%%%%%%%%%%%%%%%%%'
+        #print 'bx,by,bz = %1.2f, %1.2f, %1.2f'%(bx_interp,by_interp,bz_interp)
+        #print '1x,1y,1z = %1.2f, %1.2f, %1.2f'%(b_perp1x,b_perp1y,b_perp1z)
+        #print '2x,2y,2z = %1.2f, %1.2f, %1.2f'%(b_perp2x,b_perp2y,b_perp2z)
+        #print '%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%'
+        #print '%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%'
 
-        print 'Rotating Velocties'
-        velo = {'i':{},'e':{}}
-        velo['i']['par']   = (bx_interp*self.particles['i']['vx']+by_interp*self.particles['i']['vy']+bz_interp*self.particles['i']['vz'])/bmag_interp
-        velo['i']['perp1'] = self.particles['i']['vx']*b_perp1x+self.particles['i']['vy']*b_perp1y+self.particles['i']['vz']*b_perp1z
-        velo['i']['perp2'] = self.particles['i']['vx']*b_perp2x+self.particles['i']['vy']*b_perp2y+self.particles['i']['vz']*b_perp2z
+        #qc#print 'Rotating Velocties'
+        velo={}
+        for species in self.species:
+            velo[species] = {}
 
-        velo['e']['par']   = (bx_interp*self.particles['e']['vx']+by_interp*self.particles['e']['vy']+bz_interp*self.particles['e']['vz'])/bmag_interp
-        velo['e']['perp1'] = self.particles['e']['vx']*b_perp1x+self.particles['e']['vy']*b_perp1y+self.particles['e']['vz']*b_perp1z
-        velo['e']['perp2'] = self.particles['e']['vx']*b_perp2x+self.particles['e']['vy']*b_perp2y+self.particles['e']['vz']*b_perp2z
+            velo[species]['par']   = (bx_interp*self.particles[species]['vx']+by_interp*self.particles[species]['vy']+bz_interp*self.particles[species]['vz'])/bmag_interp
+            velo[species]['perp1'] = self.particles[species]['vx']*b_perp1x+self.particles[species]['vy']*b_perp1y+self.particles[species]['vz']*b_perp1z
+            velo[species]['perp2'] = self.particles[species]['vx']*b_perp2x+self.particles[species]['vy']*b_perp2y+self.particles[species]['vz']*b_perp2z
 
-        print 'Generating Histograms'
+
+        #velo['e']['par']   = (bx_interp*self.particles['e']['vx']+by_interp*self.particles['e']['vy']+bz_interp*self.particles['e']['vz'])/bmag_interp
+        #velo['e']['perp1'] = self.particles['e']['vx']*b_perp1x+self.particles['e']['vy']*b_perp1y+self.particles['e']['vz']*b_perp1z
+        #velo['e']['perp2'] = self.particles['e']['vx']*b_perp2x+self.particles['e']['vy']*b_perp2y+self.particles['e']['vz']*b_perp2z
+
+        #qc#print 'Generating Histograms'
 
         return_hist_dict = {}
-        return_hist_dict['i'] = []
-        return_hist_dict['e'] = []
-      
+        for species in self.species:
+            return_hist_dict[species] = []
+
         for species in velo.keys():
-            H, xedges, yedges = np.histogram2d(velo[species]['par'],velo[species]['perp1'],bins=bins)
+            if kwargs.has_key('range'):
+                H, xedges, yedges = np.histogram2d(velo[species]['par'],velo[species]['perp1'],**kwargs)
+            else:
+                H, xedges, yedges = np.histogram2d(velo[species]['par'],velo[species]['perp1'])
 # H needs to be rotated and flipped
             H = np.rot90(H)
             H = np.flipud(H)
             return_hist_dict[species].append(['Parallel vs Perp 1 (+zy)',H,xedges,yedges])
 
-            H, xedges, yedges = np.histogram2d(velo[species]['par'],velo[species]['perp2'],bins=bins)
+            if kwargs.has_key('range'):
+                H, xedges, yedges = np.histogram2d(velo[species]['par'],velo[species]['perp2'],**kwargs)
+            else:
+                H, xedges, yedges = np.histogram2d(velo[species]['par'],velo[species]['perp2'])
             H = np.rot90(H)
             H = np.flipud(H)
             return_hist_dict[species].append(['Parallel vs Perp 2',H,xedges,yedges])
 
-            H, xedges, yedges = np.histogram2d(velo[species]['perp1'],velo[species]['perp2'],bins=bins)
+            if kwargs.has_key('range'):
+                H, xedges, yedges = np.histogram2d(velo[species]['perp1'],velo[species]['perp2'],**kwargs)
+            else:
+                H, xedges, yedges = np.histogram2d(velo[species]['perp1'],velo[species]['perp2'])
             H = np.rot90(H)
             H = np.flipud(H)
             return_hist_dict[species].append(['Perp 1 (+zy) vs Perp 2',H,xedges,yedges])
@@ -379,28 +407,28 @@ class p3d_dump(object):
         return return_hist_dict
 
 
-    def _vdist_2d(self,bins):
+    def _vdist_2d(self,**kwargs):
         """
         """
-        print 'Generating Histograms'
+        #qc#print 'Generating Histograms'
 
         return_hist_dict = {}
         return_hist_dict['i'] = []
         return_hist_dict['e'] = []
       
         for species in self.species:
-            H, xedges, yedges = np.histogram2d(self.particles[species]['vx'],self.particles[species]['vy'],bins=bins)
+            H, xedges, yedges = np.histogram2d(self.particles[species]['vx'],self.particles[species]['vy'],**kwargs)
 # H needs to be rotated and flipped
             H = np.rot90(H)
             H = np.flipud(H)
             return_hist_dict[species].append(['X vs Y',H,xedges,yedges])
 
-            H, xedges, yedges = np.histogram2d(self.particles[species]['vx'],self.particles[species]['vz'],bins=bins)
+            H, xedges, yedges = np.histogram2d(self.particles[species]['vx'],self.particles[species]['vz'],**kwargs)
             H = np.rot90(H)
             H = np.flipud(H)
             return_hist_dict[species].append(['X vs Z',H,xedges,yedges])
 
-            H, xedges, yedges = np.histogram2d(self.particles[species]['vy'],self.particles[species]['vz'],bins=bins)
+            H, xedges, yedges = np.histogram2d(self.particles[species]['vy'],self.particles[species]['vz'],**kwargs)
             H = np.rot90(H)
             H = np.flipud(H)
             return_hist_dict[species].append(['Y vs Z',H,xedges,yedges])
@@ -429,13 +457,13 @@ class p3d_dump(object):
         """
         x0 = r0[0]
         y0 = r0[1]
-        if isinstance(dx,list): # Square box is assumed
+        if isinstance(dx,list):
             dy = dx[1]
             dx = dx[0]
-        else:
-            dy = dx 
+        else: 
+            dy = dx       # Square box is assumed
 
-        print 'r0 = [%f,%f] and dx = [%f,%f]'%(x0,y0,dx,dy)
+        #qc#print 'r0 = [%f,%f] and dx = [%f,%f]'%(x0,y0,dx,dy)
 # Figure out which set of processors we are on
         xlb = x0 - dx/2.
         xub = x0 + dx/2.
@@ -447,9 +475,9 @@ class p3d_dump(object):
         #xproc_lb = (int(np.floor(1.0*self.param_dict['pex']*xlb/self.param_dict['lx']))+1)%int(self.param_dict['nchannels'])
         if type(self.param_dict['nchannels']) == str:
 # Man you should fix this colby!!!
-            self.param_dict['nchannels'] =  self.param_dict['pex']
+            #self.param_dict['nchannels'] =  self.param_dict['pex'] # a lot of times we just set nchannels as pex
+            self.param_dict['nchannels'] =  self.param_dict[self.param_dict['nchannels']]
 
-        print 'oioioioiooioiooioiio ylb = %s yub = %s '%(ylb,yub)
         xproc_lb = (int(np.floor(1.0*self.param_dict['pex']*xlb/self.param_dict['lx']))+1)%self.param_dict['nchannels']
 # Colby this needs to be cooded better!!!
 # if you have a diffent number of channels than pex you run into some shit
@@ -464,7 +492,17 @@ class p3d_dump(object):
             print 'Lower Bound greater than upper bound! That is obviously an issue!'
             return -1
 
-        print 'oioioioiooioiooioiio ylp = %s yup = %s '%(yproc_lb,yproc_ub)
+        if xproc_lb < 1: xproc_lb = 1
+        if xproc_ub > self.param_dict['nchannels']: xproc_ub = self.param_dict['nchannels'] 
+
+#Colby! you can code this smarter but presently you are not doing that!
+# To code smarter, insted of making this simple upper bound you should code
+# to allow for nchanles to be a non multiple of pex
+        max_yproc =  int(round(self.param_dict['pex']*self.param_dict['pey']/self.param_dict['nchannels']))
+        if yproc_lb < 0: yproc_lb = 0
+        if yproc_ub > max_yproc:
+            yproc_ub = max_yproc
+
 
         xprocs_2load = range(xproc_lb,xproc_ub+1)
         yprocs_2load = range(yproc_lb,yproc_ub+1)
@@ -482,7 +520,7 @@ class p3d_dump(object):
         for xprocs_index in xprocs_2load:
             dump_dat_dict = {}
             dump_index = self._num_to_ext(xprocs_index)
-            print 'Loading in xproc number '+dump_index
+            #qc#print 'Loading in xproc number '+dump_index
             temp_dump_dat = self.read_dump_file(dump_index)
 
             #c# new_tdd = {}
@@ -506,50 +544,50 @@ class p3d_dump(object):
 # second for loop over the py
 # also just doing electron for right now
                 for yprocs_index in yprocs_2load:
-
+                    self._debug = temp_dump_dat 
                     temp_dump_yproc = temp_dump_dat[species][yprocs_index]
 # You only need to sort if you are on the edge processors
                     if yprocs_index == yprocs_2load[0] or yprocs_index == yprocs_2load[-1]: 
-                        print '\t\tSorting yproc number '+str(yprocs_index)
+                        #qc#print '\t\tSorting yproc number '+str(yprocs_index)
                         sorted_index = temp_dump_dat[species][yprocs_index].argsort(order='y')
                         temp_dump_yproc = temp_dump_dat[species][yprocs_index][sorted_index]
 # Here we need kind of a complecated if structure to get all the poible cases since
 # we are scaning over muliple processors.
 # If you are on your first y processor then you need to find a lower boundry
                     if yprocs_index == yprocs_2load[0]: 
-                        print '\t\t\tFinding lower yboundry index '
+                        #qc#print '\t\t\tFinding lower yboundry index '
                         lower_yboundry_index = np.searchsorted(temp_dump_yproc['y'],ylb)
                     else:
                         lower_yboundry_index = 0#np.searchsorted(temp_dump_yproc['y'],ylb)
 # If you are on your last y processor then you need to find a upper boundry
                     if yprocs_index == yprocs_2load[-1]: 
-                        print '\t\t\tFinding upper yboundry index '
+                        #qc#print '\t\t\tFinding upper yboundry index '
                         upper_yboundry_index = np.searchsorted(temp_dump_yproc['y'],yub)
                     else:
                         upper_yboundry_index = -1#np.searchsorted(temp_dump_yproc['y'],yub)
                     # You only need to sort if you are on the edge processors
                     temp_dump_xproc = temp_dump_yproc[lower_yboundry_index:upper_yboundry_index]
                     if xprocs_index == xprocs_2load[0] or xprocs_index == xprocs_2load[-1]: 
-                        print '\t\tNow sorting x values for remaing data'
+                        #qc#print '\t\tNow sorting x values for remaing data'
                         sorted_index = temp_dump_xproc.argsort(order='x')
                         temp_dump_xproc = temp_dump_xproc[sorted_index] 
 # If you are on your first x processor then you need to find a lower boundry
                     if xprocs_index == xprocs_2load[0]: 
-                        print '\t\t\tFinding lower xboundry index '
+                        #qc#print '\t\t\tFinding lower xboundry index '
                         lower_xboundry_index = np.searchsorted(temp_dump_xproc['x'],xlb)
                     else:
                         lower_xboundry_index = 0#np.searchsorted(temp_dump_xproc['x'],xlb)
 # If you are on your last x processor then you need to find a upper boundry
                     if xprocs_index == xprocs_2load[-1]: 
-                        print '\t\t\tFinding upper xboundry index '
+                        #qc#print '\t\t\tFinding upper xboundry index '
                         upper_xboundry_index = np.searchsorted(temp_dump_xproc['x'],xub)
                     else: 
                         upper_xboundry_index = -1#np.searchsorted(temp_dump_xproc['x'],xub)
                     temp_dump_pruned[species].append(temp_dump_xproc[lower_xboundry_index:upper_xboundry_index])
 
-        for cosa in self.species:
-            temp_dump_pruned[cosa] = np.concatenate(temp_dump_pruned[cosa])
-        print 'Total particles in box are: ' + str(len(temp_dump_pruned['i']))
+        for species in self.species:
+            temp_dump_pruned[species] = np.concatenate(temp_dump_pruned[species])
+            print 'Total %s in box are: %i'%(species,len(temp_dump_pruned[species]))
         return temp_dump_pruned
 
 
@@ -937,10 +975,17 @@ class p3d_dump(object):
         ny = len(field[:,0])
         ip = int(np.floor(1.0*r0[0]/lx*nx))
         jp = int(np.floor(1.0*r0[1]/ly*ny))
+
+        if ip + 1 > nx-1: ipp1 = 0
+        else: ipp1 = ip+1
+
+        if jp + 1 > ny-1: jpp1 = 0
+        else: jpp1 = jp+1
+        print ip,jp,nx,ny
         weight_x = 1.0*r0[0]/lx*nx - np.floor(1.0*r0[0]/lx*nx)
         weight_y = 1.0*r0[1]/ly*ny - np.floor(1.0*r0[1]/ly*ny)
-        return np.array([(1.-weight_x)*(1.-weight_y)*field[jp,ip] + (weight_x)*(1.-weight_y)*field[jp+1,ip] \
-               + (1.-weight_x)*(weight_y)*field[jp,ip+1]+ (weight_x)*(weight_y)*field[jp+1,ip+1]])
+        return np.array([(1.-weight_x)*(1.-weight_y)*field[jp,ip] + (weight_x)*(1.-weight_y)*field[jpp1,ip] \
+               + (1.-weight_x)*(weight_y)*field[jp,ipp1]+ (weight_x)*(weight_y)*field[jpp1,ipp1]])
     
 
 
