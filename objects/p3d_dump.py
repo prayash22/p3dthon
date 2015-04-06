@@ -477,16 +477,33 @@ class p3d_dump(object):
 # Man you should fix this colby!!!
             #self.param_dict['nchannels'] =  self.param_dict['pex'] # a lot of times we just set nchannels as pex
             self.param_dict['nchannels'] =  self.param_dict[self.param_dict['nchannels']]
-
-        xproc_lb = (int(np.floor(1.0*self.param_dict['pex']*xlb/self.param_dict['lx']))+1)%self.param_dict['nchannels']
+            
+        
+        #xproc_lb = (int(np.floor(1.0*self.param_dict['pex']*xlb/self.param_dict['lx']))+1)%self.param_dict['nchannels']
+# We are chaning this but it may not work for all stuff so you know 
+        xproc_lb = (int(np.floor(1.0*self.param_dict['pex']*xlb/self.param_dict['lx'])))%self.param_dict['nchannels'] +1
 # Colby this needs to be cooded better!!!
 # if you have a diffent number of channels than pex you run into some shit
         yproc_lb = int(np.floor(1.0*self.param_dict['pey']*ylb/self.param_dict['ly']))
         #yproc_lb = int(np.floor(1.0*self.param_dict['pey']*ylb/self.param_dict['ly']))*2 #Uncomment for yishin
         #xproc_ub = (int(np.floor(1.0*self.param_dict['pex']*xub/self.param_dict['lx']))+1)%int(self.param_dict['nchannels'])
-        xproc_ub = (int(np.floor(1.0*self.param_dict['pex']*xub/self.param_dict['lx']))+1)%self.param_dict['nchannels']
+        xproc_ub = (int(np.floor(1.0*self.param_dict['pex']*xub/self.param_dict['lx'])))%self.param_dict['nchannels'] +1
         yproc_ub = int(np.floor(1.0*self.param_dict['pey']*yub/self.param_dict['ly'])) 
         #yproc_ub = int(np.floor(1.0*self.param_dict['pey']*yub/self.param_dict['ly']))*2 #Uncomment for yishin
+
+#db#        print '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
+#db#        print 'X,Yulb'
+#db#        print xlb
+#db#        print xub
+#db#        print ylb
+#db#        print yub
+#db#        print '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
+#db#        print 'X,Yproc ulb'
+#db#        print xproc_lb
+#db#        print xproc_ub
+#db#        print yproc_lb
+#db#        print yproc_ub
+#db#        print '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
 
         if xproc_lb > xproc_ub:
             print 'Lower Bound greater than upper bound! That is obviously an issue!'
