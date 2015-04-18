@@ -240,7 +240,7 @@ class p3d_dump(object):
         movie_num_int = raw_input()
         return int(movie_num_int)
 
-    def vdist_2d(self,r0=[0.5,0.5],dx=[1.0,1.0],species='e',par=False,Bvec=False,OneD=False,**kwargs):
+    def vdist_2d(self,r0=[0.5,0.5],dx=[1.0,1.0],par=False,Bvec=False,pitch=False,OneD=False,**kwargs):
         """
         #---------------------------------------------------------------------------------------------------------------
         #   Method      : vdist_2d_par
@@ -263,7 +263,6 @@ class p3d_dump(object):
         #               : so we can pick zero as a boundry and the code will know what todo.
         #---------------------------------------------------------------------------------------------------------------
         """
-
 # Turn this into a method
 #%%%%%%%%%%%%%%%
         if OneD: # Make dy = ly
@@ -297,10 +296,14 @@ class p3d_dump(object):
 #
 # Right now im only coding the faster one
         if not kwargs.has_key('bins'): kwargs['bins']=51
-        if par or Bvec:
+
+        if par or Bvec or pitch:
             #qc#print 'Reading in the Fields form the Dump File'
             self.dump_field_dict = self.read_dump_file(fields=True)
-            if par:
+            print 'pitch'
+            if pitch:
+                return_hist = self._vdist_pitch(**kwargs)
+            elif par:
                 return_hist = self._vdist_2d_par(**kwargs)
             else:
                 return_hist = self._vdist_2d(**kwargs)
@@ -313,6 +316,161 @@ class p3d_dump(object):
 
         return return_hist
 
+
+    def _vdist_pitch(self,**kwargs):
+
+        if not kwargs.has_key('pa'): pa = 90. #pa = pitch_angle, but I am lazy
+        else: pa = kwargs.pop('pa') 
+        if not kwargs.has_key('dpa'): dpa = 5.
+        else: dpa = kwargs.pop('dpa') 
+        
+        delx = self.param_dict['lx']*1.0/self.param_dict['pex']/self.param_dict['nx']
+        dely = self.param_dict['ly']*1.0/(self.param_dict['pey']*self.param_dict['ny'])
+
+        velo={}
+        return_hist_dict = {}
+        for species in self.species:
+
+            xind = (np.floor((self.particles[species]['x']-delx/2.0)/delx)).astype(int)
+            yind = (np.floor((self.particles[species]['y']-dely/2.0)/dely)).astype(int)
+
+            wx = (self.particles[species]['x']-delx/2.0)%delx
+            wy = (self.particles[species]['y']-dely/2.0)%dely
+
+            print 'Getting partbx...'
+            partbx = wx     *wy     *self.dump_field_dict['bx'][xind.tolist()    ,yind.tolist()] + \
+                     (1.-wx)*wy     *self.dump_field_dict['bx'][(xind+1).tolist(),yind.tolist()] + \
+                     wx     *(1.-wy)*self.dump_field_dict['bx'][xind.tolist()    ,(yind+1).tolist()] + \
+                     (1.-wx)*(1.-wy)*self.dump_field_dict['bx'][(xind+1).tolist(),(yind+1).tolist()] 
+
+            print 'Getting partby...'
+            partby = wx     *wy     *self.dump_field_dict['by'][xind.tolist()    ,yind.tolist()] + \
+                     (1.-wx)*wy     *self.dump_field_dict['by'][(xind+1).tolist(),yind.tolist()] + \
+                     wx     *(1.-wy)*self.dump_field_dict['by'][xind.tolist()    ,(yind+1).tolist()] + \
+                     (1.-wx)*(1.-wy)*self.dump_field_dict['by'][(xind+1).tolist(),(yind+1).tolist()] 
+
+            print 'Getting partbz...'
+            partbz = wx     *wy     *self.dump_field_dict['bz'][xind.tolist()    ,yind.tolist()] + \
+                     (1.-wx)*wy     *self.dump_field_dict['bz'][(xind+1).tolist(),yind.tolist()] + \
+                     wx     *(1.-wy)*self.dump_field_dict['bz'][xind.tolist()    ,(yind+1).tolist()] + \
+                     (1.-wx)*(1.-wy)*self.dump_field_dict['bz'][(xind+1).tolist(),(yind+1).tolist()] 
+
+            vmag = np.sqrt(self.particles[species]['vx']**2+self.particles[species]['vy']**2+self.particles[species]['vz']**2)
+            vpar = (self.particles[species]['vx']*partbx+self.particles[species]['vy']*partby+self.particles[species]['vz']*partbz)/np.sqrt(partbx**2+partby**2+partbz**2)
+
+            pitch_angle = np.arccos(vpar/vmag)/np.pi*180.
+
+            subpartind = np.where(abs(pitch_angle - pa) < dpa)
+
+
+            subpart = self.particles[species][subpartind]
+            pitch_angle = pitch_angle[subpartind] 
+            partbx = partbx[subpartind]
+            partby = partby[subpartind]
+            partbz = partbz[subpartind]
+
+            bp11 = -1.0*partbz/np.sqrt(partbx**2 + partbz**2)
+            bp12 = 0.0*partby
+            bp13 = partbx/np.sqrt(partbx**2 + partbz**2)
+
+            bp21 = (partby*bp13 - partbz*bp12)/np.sqrt(partbx**2+partby**2+partbz**2)
+            bp22 = (partbz*bp11 - partbx*bp13)/np.sqrt(partbx**2+partby**2+partbz**2)
+            bp23 = (partbx*bp12 - partby*bp11)/np.sqrt(partbx**2+partby**2+partbz**2)
+            
+            self.pa = subpart
+
+### This takes says that the B field is just the value at r0
+#c#        #qc#print 'Calculating B field'
+#c#        # this version doent work 
+#c#        #bx_interp = self.interp_field(self.dump_field_dict['bx'],self.param_dict['lx'],self.param_dict['ly'],self._r0[0],self._r0[1])
+#c#        #by_interp = self.interp_field(self.dump_field_dict['by'],self.param_dict['lx'],self.param_dict['ly'],self._r0[0],self._r0[1])
+#c#        #bz_interp = self.interp_field(self.dump_field_dict['bz'],self.param_dict['lx'],self.param_dict['ly'],self._r0[0],self._r0[1])
+#c#        bx_interp = self.interp_field(self.dump_field_dict['bx'],self.param_dict['lx'],self.param_dict['ly'],self._r0)
+#c#        by_interp = self.interp_field(self.dump_field_dict['by'],self.param_dict['lx'],self.param_dict['ly'],self._r0)
+#c#        bz_interp = self.interp_field(self.dump_field_dict['bz'],self.param_dict['lx'],self.param_dict['ly'],self._r0)
+#c#        bmag_interp = (bx_interp**2+by_interp**2+bz_interp**2)**.5
+#c#
+#c#
+#c#        if by_interp > 0.:
+#c#            b_perp1x = 0.
+#c#            b_perp1y = -1.*bz_interp/(bz_interp**2 + by_interp**2)**(.5)
+#c#            b_perp1z = by_interp/(bx_interp**2 + by_interp**2)**(.5)
+#c#        else:
+#c#            b_perp1x = 0.
+#c#            b_perp1y = bz_interp/(bz_interp**2 + by_interp**2)**(.5)
+#c#            b_perp1z = -1.*by_interp/(bx_interp**2 + by_interp**2)**(.5)
+#c#
+#c#        b_perpmag = (b_perp1x**2+b_perp1y**2+b_perp1z**2)**.5
+#c#        b_perp1x = b_perp1x/b_perpmag
+#c#        b_perp1y = b_perp1y/b_perpmag
+#c#        b_perp1z = b_perp1z/b_perpmag
+#c#
+#c#        b_perp2x = (by_interp*b_perp1z - bz_interp*b_perp1y)
+#c#        b_perp2y = (bz_interp*b_perp1x - bx_interp*b_perp1z)
+#c#        b_perp2z = (bx_interp*b_perp1y - by_interp*b_perp1x)
+#c#        b_perpmag = (b_perp2x**2+b_perp2y**2+b_perp2z**2)**.5
+#c#        b_perp2x = b_perp2x/b_perpmag
+#c#        b_perp2y = b_perp2y/b_perpmag
+#c#        b_perp2z = b_perp2z/b_perpmag
+
+            #qc#print 'Rotating Velocties'
+#new way
+            veloperp1 = subpart['vx']*bp11+subpart['vy']*bp12+subpart['vz']*bp13
+            veloperp2 = subpart['vx']*bp21+subpart['vy']*bp22+subpart['vz']*bp23
+
+            return_hist_dict[species] = []
+            if kwargs.has_key('range'):
+                H, xedges, yedges = np.histogram2d(veloperp1,veloperp2,**kwargs)
+            else:
+                H, xedges, yedges = np.histogram2d(veloperp1,veloperp2)
+            H = np.rot90(H)
+            H = np.flipud(H)
+            return_hist_dict[species].append(H)
+            return_hist_dict[species].append(xedges)
+            return_hist_dict[species].append(yedges)
+
+#        for species in self.species:
+#            velo[species] = {}
+#
+#            velo[species]['par']   = (bx_interp*self.particles[species]['vx']+by_interp*self.particles[species]['vy']+bz_interp*self.particles[species]['vz'])/bmag_interp
+#            velo[species]['perp1'] = self.particles[species]['vx']*b_perp1x+self.particles[species]['vy']*b_perp1y+self.particles[species]['vz']*b_perp1z
+#            velo[species]['perp2'] = self.particles[species]['vx']*b_perp2x+self.particles[species]['vy']*b_perp2y+self.particles[species]['vz']*b_perp2z
+
+
+###        return_hist_dict = {}
+###        for species in self.species:
+###            return_hist_dict[species] = []
+###
+###        for species in velo.keys():
+###            if kwargs.has_key('range'):
+###                H, xedges, yedges = np.histogram2d(velo[species]['par'],velo[species]['perp1'],**kwargs)
+###            else:
+###                H, xedges, yedges = np.histogram2d(velo[species]['par'],velo[species]['perp1'])
+#### H needs to be rotated and flipped
+###            H = np.rot90(H)
+###            H = np.flipud(H)
+###            return_hist_dict[species].append(['Parallel vs Perp 1 (+zy)',H,xedges,yedges])
+###
+###            if kwargs.has_key('range'):
+###                H, xedges, yedges = np.histogram2d(velo[species]['par'],velo[species]['perp2'],**kwargs)
+###            else:
+###                H, xedges, yedges = np.histogram2d(velo[species]['par'],velo[species]['perp2'])
+###            H = np.rot90(H)
+###            H = np.flipud(H)
+###            return_hist_dict[species].append(['Parallel vs Perp 2',H,xedges,yedges])
+###
+###            if kwargs.has_key('range'):
+###                H, xedges, yedges = np.histogram2d(velo[species]['perp1'],velo[species]['perp2'],**kwargs)
+###            else:
+###                H, xedges, yedges = np.histogram2d(velo[species]['perp1'],velo[species]['perp2'])
+###            H = np.rot90(H)
+###            H = np.flipud(H)
+###            return_hist_dict[species].append(['Perp 1 (+zy) vs Perp 2',H,xedges,yedges])
+
+# Mask zeros
+         #Hmasked = np.ma.masked_where(H==0,H)
+
+        return return_hist_dict
 
     def _vdist_2d_par(self,**kwargs):
         #qc#print 'Calculating B field'
