@@ -809,55 +809,51 @@ class p3d_dump(object):
             for species in self.species:
                 if species == 'i':
                     print '\tSelecting Ions'
-############## Major thing I am just trying to speed up somthing, this hsould not be here!!!!
-                    print '\tSkipping Ions, THIS SHOULD NOT BE HERE UNLESS YOU KNOW EXACLTY WHY IT IS HERE!!!!!!!'
-############## decrment the indent of every thing below for yprocs idex untill the please god remove this part
                 else:
                     print '\tSelecting Electrons'
 # second for loop over the py
 # also just doing electron for right now
-                    for yprocs_index in yprocs_2load:
-                        self._debug = temp_dump_dat 
-                        temp_dump_yproc = temp_dump_dat[species][yprocs_index]
+                for yprocs_index in yprocs_2load:
+                    self._debug = temp_dump_dat 
+                    temp_dump_yproc = temp_dump_dat[species][yprocs_index]
 # You only need to sort if you are on the edge processors
-                        if yprocs_index == yprocs_2load[0] or yprocs_index == yprocs_2load[-1]: 
-                            #qc#print '\t\tSorting yproc number '+str(yprocs_index)
-                            sorted_index = temp_dump_dat[species][yprocs_index].argsort(order='y')
-                            temp_dump_yproc = temp_dump_dat[species][yprocs_index][sorted_index]
+                    if yprocs_index == yprocs_2load[0] or yprocs_index == yprocs_2load[-1]: 
+                        #qc#print '\t\tSorting yproc number '+str(yprocs_index)
+                        sorted_index = temp_dump_dat[species][yprocs_index].argsort(order='y')
+                        temp_dump_yproc = temp_dump_dat[species][yprocs_index][sorted_index]
 # Here we need kind of a complecated if structure to get all the poible cases since
 # we are scaning over muliple processors.
 # If you are on your first y processor then you need to find a lower boundry
-                        if yprocs_index == yprocs_2load[0]: 
-                            #qc#print '\t\t\tFinding lower yboundry index '
-                            lower_yboundry_index = np.searchsorted(temp_dump_yproc['y'],ylb)
-                        else:
-                            lower_yboundry_index = 0#np.searchsorted(temp_dump_yproc['y'],ylb)
+                    if yprocs_index == yprocs_2load[0]: 
+                        #qc#print '\t\t\tFinding lower yboundry index '
+                        lower_yboundry_index = np.searchsorted(temp_dump_yproc['y'],ylb)
+                    else:
+                        lower_yboundry_index = 0#np.searchsorted(temp_dump_yproc['y'],ylb)
 # If you are on your last y processor then you need to find a upper boundry
-                        if yprocs_index == yprocs_2load[-1]: 
-                            #qc#print '\t\t\tFinding upper yboundry index '
-                            upper_yboundry_index = np.searchsorted(temp_dump_yproc['y'],yub)
-                        else:
-                            upper_yboundry_index = -1#np.searchsorted(temp_dump_yproc['y'],yub)
-                        # You only need to sort if you are on the edge processors
-                        temp_dump_xproc = temp_dump_yproc[lower_yboundry_index:upper_yboundry_index]
-                        if xprocs_index == xprocs_2load[0] or xprocs_index == xprocs_2load[-1]: 
-                            #qc#print '\t\tNow sorting x values for remaing data'
-                            sorted_index = temp_dump_xproc.argsort(order='x')
-                            temp_dump_xproc = temp_dump_xproc[sorted_index] 
+                    if yprocs_index == yprocs_2load[-1]: 
+                        #qc#print '\t\t\tFinding upper yboundry index '
+                        upper_yboundry_index = np.searchsorted(temp_dump_yproc['y'],yub)
+                    else:
+                        upper_yboundry_index = -1#np.searchsorted(temp_dump_yproc['y'],yub)
+                    # You only need to sort if you are on the edge processors
+                    temp_dump_xproc = temp_dump_yproc[lower_yboundry_index:upper_yboundry_index]
+                    if xprocs_index == xprocs_2load[0] or xprocs_index == xprocs_2load[-1]: 
+                        #qc#print '\t\tNow sorting x values for remaing data'
+                        sorted_index = temp_dump_xproc.argsort(order='x')
+                        temp_dump_xproc = temp_dump_xproc[sorted_index] 
 # If you are on your first x processor then you need to find a lower boundry
-                        if xprocs_index == xprocs_2load[0]: 
-                            #qc#print '\t\t\tFinding lower xboundry index '
-                            lower_xboundry_index = np.searchsorted(temp_dump_xproc['x'],xlb)
-                        else:
-                            lower_xboundry_index = 0#np.searchsorted(temp_dump_xproc['x'],xlb)
+                    if xprocs_index == xprocs_2load[0]: 
+                        #qc#print '\t\t\tFinding lower xboundry index '
+                        lower_xboundry_index = np.searchsorted(temp_dump_xproc['x'],xlb)
+                    else:
+                        lower_xboundry_index = 0#np.searchsorted(temp_dump_xproc['x'],xlb)
 # If you are on your last x processor then you need to find a upper boundry
-                        if xprocs_index == xprocs_2load[-1]: 
-                            #qc#print '\t\t\tFinding upper xboundry index '
-                            upper_xboundry_index = np.searchsorted(temp_dump_xproc['x'],xub)
-                        else: 
-                            upper_xboundry_index = -1#np.searchsorted(temp_dump_xproc['x'],xub)
-                        temp_dump_pruned[species].append(temp_dump_xproc[lower_xboundry_index:upper_xboundry_index])
-        temp_dump_pruned['i'] = temp_dump_pruned['e'] #Please god REMOVE THIS PART!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                    if xprocs_index == xprocs_2load[-1]: 
+                        #qc#print '\t\t\tFinding upper xboundry index '
+                        upper_xboundry_index = np.searchsorted(temp_dump_xproc['x'],xub)
+                    else: 
+                        upper_xboundry_index = -1#np.searchsorted(temp_dump_xproc['x'],xub)
+                    temp_dump_pruned[species].append(temp_dump_xproc[lower_xboundry_index:upper_xboundry_index])
         for species in self.species:
             temp_dump_pruned[species] = np.concatenate(temp_dump_pruned[species])
             print 'Total %s in box are: %i'%(species,len(temp_dump_pruned[species]))
