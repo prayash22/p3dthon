@@ -240,7 +240,7 @@ class p3d_dump(object):
         movie_num_int = raw_input()
         return int(movie_num_int)
 
-    def vdist_2d(self,r0=[0.5,0.5],dx=[1.0,1.0],species='e',par=False,Bvec=False,OneD=False,**kwargs):
+    def vdist_2d(self,r0=[0.5,0.5],dx=[1.0,1.0],species='e',par=False,Bvec=False,pitch=False,OneD=False,**kwargs):
         """
         #---------------------------------------------------------------------------------------------------------------
         #   Method      : vdist_2d_par
@@ -297,10 +297,12 @@ class p3d_dump(object):
 #
 # Right now im only coding the faster one
         if not kwargs.has_key('bins'): kwargs['bins']=51
-        if par or Bvec:
+        if pitch or par or Bvec:
             #qc#print 'Reading in the Fields form the Dump File'
             self.dump_field_dict = self.read_dump_file(fields=True)
-            if par:
+            if pitch:
+                return_hist = self._vdist_pitch(**kwargs)
+            elif par:
                 return_hist = self._vdist_2d_par(**kwargs)
             else:
                 return_hist = self._vdist_2d(**kwargs)
@@ -312,6 +314,98 @@ class p3d_dump(object):
             return_hist = self._vdist_2d(**kwargs)
 
         return return_hist
+
+    def _vdist_pitch(self,**kwargs):
+        #qc#print 'Calculating B field'
+        # this version doent work 
+        #bx_interp = self.interp_field(self.dump_field_dict['bx'],self.param_dict['lx'],self.param_dict['ly'],self._r0[0],self._r0[1])
+        #by_interp = self.interp_field(self.dump_field_dict['by'],self.param_dict['lx'],self.param_dict['ly'],self._r0[0],self._r0[1])
+        #bz_interp = self.interp_field(self.dump_field_dict['bz'],self.param_dict['lx'],self.param_dict['ly'],self._r0[0],self._r0[1])
+        bx_interp = self.interp_field(self.dump_field_dict['bx'],self.param_dict['lx'],self.param_dict['ly'],self._r0)
+        by_interp = self.interp_field(self.dump_field_dict['by'],self.param_dict['lx'],self.param_dict['ly'],self._r0)
+        bz_interp = self.interp_field(self.dump_field_dict['bz'],self.param_dict['lx'],self.param_dict['ly'],self._r0)
+        bmag_interp = (bx_interp**2+by_interp**2+bz_interp**2)**.5
+
+        if by_interp > 0.:
+            b_perp1x = 0.
+            b_perp1y = -1.*bz_interp/(bz_interp**2 + by_interp**2)**(.5)
+            b_perp1z = by_interp/(bx_interp**2 + by_interp**2)**(.5)
+        else:
+            b_perp1x = 0.
+            b_perp1y = bz_interp/(bz_interp**2 + by_interp**2)**(.5)
+            b_perp1z = -1.*by_interp/(bx_interp**2 + by_interp**2)**(.5)
+
+        b_perpmag = (b_perp1x**2+b_perp1y**2+b_perp1z**2)**.5
+        b_perp1x = b_perp1x/b_perpmag
+        b_perp1y = b_perp1y/b_perpmag
+        b_perp1z = b_perp1z/b_perpmag
+
+        b_perp2x = (by_interp*b_perp1z - bz_interp*b_perp1y)
+        b_perp2y = (bz_interp*b_perp1x - bx_interp*b_perp1z)
+        b_perp2z = (bx_interp*b_perp1y - by_interp*b_perp1x)
+        b_perpmag = (b_perp2x**2+b_perp2y**2+b_perp2z**2)**.5
+        b_perp2x = b_perp2x/b_perpmag
+        b_perp2y = b_perp2y/b_perpmag
+        b_perp2z = b_perp2z/b_perpmag
+
+        #print '%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%'
+        #print '%%%%%%%%%%%%%%%%%%%%%%%%%%% DEBUG %%%%%%%%%%%%%%%%%%%%%%%%%%%'
+        #print 'bx,by,bz = %1.2f, %1.2f, %1.2f'%(bx_interp,by_interp,bz_interp)
+        #print '1x,1y,1z = %1.2f, %1.2f, %1.2f'%(b_perp1x,b_perp1y,b_perp1z)
+        #print '2x,2y,2z = %1.2f, %1.2f, %1.2f'%(b_perp2x,b_perp2y,b_perp2z)
+        #print '%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%'
+        #print '%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%'
+
+        #qc#print 'Rotating Velocties'
+        velo={}
+        for species in self.species:
+            velo[species] = {}
+
+            velo[species]['par']   = (bx_interp*self.particles[species]['vx']+by_interp*self.particles[species]['vy']+bz_interp*self.particles[species]['vz'])/bmag_interp
+            velo[species]['perp1'] = self.particles[species]['vx']*b_perp1x+self.particles[species]['vy']*b_perp1y+self.particles[species]['vz']*b_perp1z
+            velo[species]['perp2'] = self.particles[species]['vx']*b_perp2x+self.particles[species]['vy']*b_perp2y+self.particles[species]['vz']*b_perp2z
+
+
+        #velo['e']['par']   = (bx_interp*self.particles['e']['vx']+by_interp*self.particles['e']['vy']+bz_interp*self.particles['e']['vz'])/bmag_interp
+        #velo['e']['perp1'] = self.particles['e']['vx']*b_perp1x+self.particles['e']['vy']*b_perp1y+self.particles['e']['vz']*b_perp1z
+        #velo['e']['perp2'] = self.particles['e']['vx']*b_perp2x+self.particles['e']['vy']*b_perp2y+self.particles['e']['vz']*b_perp2z
+
+        #qc#print 'Generating Histograms'
+
+        return_hist_dict = {}
+        for species in self.species:
+            return_hist_dict[species] = []
+
+        for species in velo.keys():
+            if kwargs.has_key('range'):
+                H, xedges, yedges = np.histogram2d(velo[species]['par'],velo[species]['perp1'],**kwargs)
+            else:
+                H, xedges, yedges = np.histogram2d(velo[species]['par'],velo[species]['perp1'])
+# H needs to be rotated and flipped
+            H = np.rot90(H)
+            H = np.flipud(H)
+            return_hist_dict[species].append(['Parallel vs Perp 1 (+zy)',H,xedges,yedges])
+
+            if kwargs.has_key('range'):
+                H, xedges, yedges = np.histogram2d(velo[species]['par'],velo[species]['perp2'],**kwargs)
+            else:
+                H, xedges, yedges = np.histogram2d(velo[species]['par'],velo[species]['perp2'])
+            H = np.rot90(H)
+            H = np.flipud(H)
+            return_hist_dict[species].append(['Parallel vs Perp 2',H,xedges,yedges])
+
+            if kwargs.has_key('range'):
+                H, xedges, yedges = np.histogram2d(velo[species]['perp1'],velo[species]['perp2'],**kwargs)
+            else:
+                H, xedges, yedges = np.histogram2d(velo[species]['perp1'],velo[species]['perp2'])
+            H = np.rot90(H)
+            H = np.flipud(H)
+            return_hist_dict[species].append(['Perp 1 (+zy) vs Perp 2',H,xedges,yedges])
+
+# Mask zeros
+         #Hmasked = np.ma.masked_where(H==0,H)
+
+        return return_hist_dict
 
 
     def _vdist_2d_par(self,**kwargs):
@@ -487,6 +581,10 @@ class p3d_dump(object):
         yproc_lb = int(np.floor(1.0*self.param_dict['pey']*ylb/self.param_dict['ly']))
         #yproc_lb = int(np.floor(1.0*self.param_dict['pey']*ylb/self.param_dict['ly']))*2 #Uncomment for yishin
         #xproc_ub = (int(np.floor(1.0*self.param_dict['pex']*xub/self.param_dict['lx']))+1)%int(self.param_dict['nchannels'])
+
+
+        if abs(xub - self.param_dict['lx']) < abs(np.spacing(2)): 
+            xub = self.param_dict['lx'] - np.spacing(2)
         xproc_ub = (int(np.floor(1.0*self.param_dict['pex']*xub/self.param_dict['lx'])))%self.param_dict['nchannels'] +1
         yproc_ub = int(np.floor(1.0*self.param_dict['pey']*yub/self.param_dict['ly'])) 
         #yproc_ub = int(np.floor(1.0*self.param_dict['pey']*yub/self.param_dict['ly']))*2 #Uncomment for yishin
@@ -556,52 +654,55 @@ class p3d_dump(object):
             for species in self.species:
                 if species == 'i':
                     print '\tSelecting Ions'
+############## Major thing I am just trying to speed up somthing, this hsould not be here!!!!
+                    print '\tSkipping Ions, THIS SHOULD NOT BE HERE UNLESS YOU KNOW EXACLTY WHY IT IS HERE!!!!!!!'
+############## decrment the indent of every thing below for yprocs idex untill the please god remove this part
                 else:
                     print '\tSelecting Electrons'
 # second for loop over the py
 # also just doing electron for right now
-                for yprocs_index in yprocs_2load:
-                    self._debug = temp_dump_dat 
-                    temp_dump_yproc = temp_dump_dat[species][yprocs_index]
+                    for yprocs_index in yprocs_2load:
+                        self._debug = temp_dump_dat 
+                        temp_dump_yproc = temp_dump_dat[species][yprocs_index]
 # You only need to sort if you are on the edge processors
-                    if yprocs_index == yprocs_2load[0] or yprocs_index == yprocs_2load[-1]: 
-                        #qc#print '\t\tSorting yproc number '+str(yprocs_index)
-                        sorted_index = temp_dump_dat[species][yprocs_index].argsort(order='y')
-                        temp_dump_yproc = temp_dump_dat[species][yprocs_index][sorted_index]
+                        if yprocs_index == yprocs_2load[0] or yprocs_index == yprocs_2load[-1]: 
+                            #qc#print '\t\tSorting yproc number '+str(yprocs_index)
+                            sorted_index = temp_dump_dat[species][yprocs_index].argsort(order='y')
+                            temp_dump_yproc = temp_dump_dat[species][yprocs_index][sorted_index]
 # Here we need kind of a complecated if structure to get all the poible cases since
 # we are scaning over muliple processors.
 # If you are on your first y processor then you need to find a lower boundry
-                    if yprocs_index == yprocs_2load[0]: 
-                        #qc#print '\t\t\tFinding lower yboundry index '
-                        lower_yboundry_index = np.searchsorted(temp_dump_yproc['y'],ylb)
-                    else:
-                        lower_yboundry_index = 0#np.searchsorted(temp_dump_yproc['y'],ylb)
+                        if yprocs_index == yprocs_2load[0]: 
+                            #qc#print '\t\t\tFinding lower yboundry index '
+                            lower_yboundry_index = np.searchsorted(temp_dump_yproc['y'],ylb)
+                        else:
+                            lower_yboundry_index = 0#np.searchsorted(temp_dump_yproc['y'],ylb)
 # If you are on your last y processor then you need to find a upper boundry
-                    if yprocs_index == yprocs_2load[-1]: 
-                        #qc#print '\t\t\tFinding upper yboundry index '
-                        upper_yboundry_index = np.searchsorted(temp_dump_yproc['y'],yub)
-                    else:
-                        upper_yboundry_index = -1#np.searchsorted(temp_dump_yproc['y'],yub)
-                    # You only need to sort if you are on the edge processors
-                    temp_dump_xproc = temp_dump_yproc[lower_yboundry_index:upper_yboundry_index]
-                    if xprocs_index == xprocs_2load[0] or xprocs_index == xprocs_2load[-1]: 
-                        #qc#print '\t\tNow sorting x values for remaing data'
-                        sorted_index = temp_dump_xproc.argsort(order='x')
-                        temp_dump_xproc = temp_dump_xproc[sorted_index] 
+                        if yprocs_index == yprocs_2load[-1]: 
+                            #qc#print '\t\t\tFinding upper yboundry index '
+                            upper_yboundry_index = np.searchsorted(temp_dump_yproc['y'],yub)
+                        else:
+                            upper_yboundry_index = -1#np.searchsorted(temp_dump_yproc['y'],yub)
+                        # You only need to sort if you are on the edge processors
+                        temp_dump_xproc = temp_dump_yproc[lower_yboundry_index:upper_yboundry_index]
+                        if xprocs_index == xprocs_2load[0] or xprocs_index == xprocs_2load[-1]: 
+                            #qc#print '\t\tNow sorting x values for remaing data'
+                            sorted_index = temp_dump_xproc.argsort(order='x')
+                            temp_dump_xproc = temp_dump_xproc[sorted_index] 
 # If you are on your first x processor then you need to find a lower boundry
-                    if xprocs_index == xprocs_2load[0]: 
-                        #qc#print '\t\t\tFinding lower xboundry index '
-                        lower_xboundry_index = np.searchsorted(temp_dump_xproc['x'],xlb)
-                    else:
-                        lower_xboundry_index = 0#np.searchsorted(temp_dump_xproc['x'],xlb)
+                        if xprocs_index == xprocs_2load[0]: 
+                            #qc#print '\t\t\tFinding lower xboundry index '
+                            lower_xboundry_index = np.searchsorted(temp_dump_xproc['x'],xlb)
+                        else:
+                            lower_xboundry_index = 0#np.searchsorted(temp_dump_xproc['x'],xlb)
 # If you are on your last x processor then you need to find a upper boundry
-                    if xprocs_index == xprocs_2load[-1]: 
-                        #qc#print '\t\t\tFinding upper xboundry index '
-                        upper_xboundry_index = np.searchsorted(temp_dump_xproc['x'],xub)
-                    else: 
-                        upper_xboundry_index = -1#np.searchsorted(temp_dump_xproc['x'],xub)
-                    temp_dump_pruned[species].append(temp_dump_xproc[lower_xboundry_index:upper_xboundry_index])
-
+                        if xprocs_index == xprocs_2load[-1]: 
+                            #qc#print '\t\t\tFinding upper xboundry index '
+                            upper_xboundry_index = np.searchsorted(temp_dump_xproc['x'],xub)
+                        else: 
+                            upper_xboundry_index = -1#np.searchsorted(temp_dump_xproc['x'],xub)
+                        temp_dump_pruned[species].append(temp_dump_xproc[lower_xboundry_index:upper_xboundry_index])
+        temp_dump_pruned['i'] = temp_dump_pruned['e'] #Please god REMOVE THIS PART!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         for species in self.species:
             temp_dump_pruned[species] = np.concatenate(temp_dump_pruned[species])
             print 'Total %s in box are: %i'%(species,len(temp_dump_pruned[species]))

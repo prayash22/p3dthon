@@ -208,9 +208,9 @@ class p3d_movie(object):
         
 
     def _movie_num_options(self):
-        choices = glob.glob(self.movie_path+'/movie.bz.*')
+        choices = glob.glob(self.movie_path+'/movie.log.*')
         if len(choices) == 0: 
-            print '!!! WARNING: the direcotry we are looking in does not have any moive.bz.XXX so we are crashing'
+            print '!!! WARNING: the direcotry we are looking in does not have any moive.log.XXX so we are crashing'
             return -1
         for var in range(np.size(choices)):
             choices[var] = choices[var][-3:]
