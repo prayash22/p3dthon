@@ -240,11 +240,7 @@ class p3d_dump(object):
         movie_num_int = raw_input()
         return int(movie_num_int)
 
-<<<<<<< HEAD
-    def vdist_2d(self,r0=[0.5,0.5],dx=[1.0,1.0],species='e',par=False,Bvec=False,pitch=False,OneD=False,**kwargs):
-=======
     def vdist_2d(self,r0=[0.5,0.5],dx=[1.0,1.0],par=False,Bvec=False,pitch=False,OneD=False,**kwargs):
->>>>>>> origin
         """
         #---------------------------------------------------------------------------------------------------------------
         #   Method      : vdist_2d_par
@@ -300,17 +296,10 @@ class p3d_dump(object):
 #
 # Right now im only coding the faster one
         if not kwargs.has_key('bins'): kwargs['bins']=51
-<<<<<<< HEAD
-        if pitch or par or Bvec:
-            #qc#print 'Reading in the Fields form the Dump File'
-            self.dump_field_dict = self.read_dump_file(fields=True)
-=======
-
         if par or Bvec or pitch:
             #qc#print 'Reading in the Fields form the Dump File'
             self.dump_field_dict = self.read_dump_file(fields=True)
             print 'pitch'
->>>>>>> origin
             if pitch:
                 return_hist = self._vdist_pitch(**kwargs)
             elif par:
