@@ -630,6 +630,9 @@ class p3d_dump(object):
         #c#      len(xprocs_2load)*len(yprocs_2load),1.41*len(xprocs_2load)*len(yprocs_2load)*4./60.)
 
 # Load in the appropriate Processors
+        temp_dump_pruned = {}# List to hold all the particles
+        for species in self.species:
+            temp_dump_pruned[species] = []
         #first for loop over px
         for xprocs_index in xprocs_2load:
             dump_dat_dict = {}
@@ -649,10 +652,8 @@ class p3d_dump(object):
             #c# temp_dump_dat = new_tdd
 
 
-            temp_dump_pruned = {}# List to hold all the particles
 # We need to looop over Ions and Electrons
             for species in self.species:
-                temp_dump_pruned[species] = []
                 #if species == 'i':
                 #    print '\tSelecting Ions'
                 #else:
