@@ -40,7 +40,8 @@ from scipy.io.idl import readsav
 
 # Currently Configured for Yellowstone
 # This should be revamped, this is now a clean way to do this
-USER = 'colbyh'
+#USER = 'colbyh'
+USER = 'psharma'
 #HOME_PATH = '/glade/u/home/'+USER+'/' 
 HOME_PATH = os.path.expanduser('~/')
 #c# The first two should be obselte now!
@@ -71,6 +72,11 @@ class p3d_run(object):
         2013-05-01
         11:21:19.671182
         """
+
+	print '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
+	print '~~~~ what is going on?    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
+	print P3DTHON_PATH
+	print '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
         if len(runname) == 0: # Start init prompt
             runname = raw_input("Please enter the runname (or 'help' for other options): ") 
 
