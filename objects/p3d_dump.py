@@ -240,30 +240,9 @@ class p3d_dump(object):
         movie_num_int = raw_input()
         return int(movie_num_int)
 
-    def vdist_2d(self,r0=[0.5,0.5],dx=[1.0,1.0],species='e',par=False,Bvec=False,OneD=False,**kwargs):
+    def vdist_2d(self,r0=[0.5,0.5],dx=[1.0,1.0],par=False,Bvec=False,pitch=False,OneD=False,**kwargs):
+        """Generates differnent 2-Dimensional histograms for particles 
         """
-        #---------------------------------------------------------------------------------------------------------------
-        #   Method      : vdist_2d_par
-        #
-        #   Discription : This method accepts a point and a width in simulation units (c/wpi) to define a box.
-        #               : In that box we bin all of the particles to form the effective distrobution function
-        #
-        #   Args        : location [x,y] ( where you want the center of you box to be located at)
-        #               : width [x,y] (the width of the box to bin particles 
-        #               : dump_num (This spesifies the particular runs dump file 
-        #
-        #   Returns     : return_hist_dict['axis'][i/e][hist_array]
-        #               :   'axis'  slecets the data for the 2d projection of the distabution function 
-        #                   'axis' = 'parperp1', 'parperp1', 'perp1perp2'
-        #                   i/e is an int that selects either the electron or ion data. i = 0, e = 1
-        #                   The rest is just an object that is returned directly from the histogram2d method
-        #
-        #
-        #   Comments    : It would be pretty easy and potential usefull to allow this to wrap around the edges
-        #               : so we can pick zero as a boundry and the code will know what todo.
-        #---------------------------------------------------------------------------------------------------------------
-        """
-
 # Turn this into a method
 #%%%%%%%%%%%%%%%
         if OneD: # Make dy = ly
@@ -297,10 +276,12 @@ class p3d_dump(object):
 #
 # Right now im only coding the faster one
         if not kwargs.has_key('bins'): kwargs['bins']=51
-        if par or Bvec:
+        if par or Bvec or pitch:
             #qc#print 'Reading in the Fields form the Dump File'
             self.dump_field_dict = self.read_dump_file(fields=True)
-            if par:
+            if pitch:
+                return_hist = self._vdist_pitch(**kwargs)
+            elif par:
                 return_hist = self._vdist_2d_par(**kwargs)
             else:
                 return_hist = self._vdist_2d(**kwargs)
@@ -313,13 +294,151 @@ class p3d_dump(object):
 
         return return_hist
 
+#wut?    def _vdist_pitch(self,**kwargs):
+#wut?        bx_interp = self.interp_field(self.dump_field_dict['bx'],self.param_dict['lx'],self.param_dict['ly'],self._r0)
+#wut?        by_interp = self.interp_field(self.dump_field_dict['by'],self.param_dict['lx'],self.param_dict['ly'],self._r0)
+#wut?        bz_interp = self.interp_field(self.dump_field_dict['bz'],self.param_dict['lx'],self.param_dict['ly'],self._r0)
+#wut?        bmag_interp = (bx_interp**2+by_interp**2+bz_interp**2)**.5
+#wut?
+#wut?        if by_interp > 0.:
+#wut?            b_perp1x = 0.
+#wut?            b_perp1y = -1.*bz_interp/(bz_interp**2 + by_interp**2)**(.5)
+#wut?            b_perp1z = by_interp/(bx_interp**2 + by_interp**2)**(.5)
+#wut?        else:
+#wut?            b_perp1x = 0.
+#wut?            b_perp1y = bz_interp/(bz_interp**2 + by_interp**2)**(.5)
+#wut?            b_perp1z = -1.*by_interp/(bx_interp**2 + by_interp**2)**(.5)
+#wut?
+#wut?        b_perpmag = (b_perp1x**2+b_perp1y**2+b_perp1z**2)**.5
+#wut?        b_perp1x = b_perp1x/b_perpmag
+#wut?        b_perp1y = b_perp1y/b_perpmag
+#wut?        b_perp1z = b_perp1z/b_perpmag
+#wut?
+#wut?        b_perp2x = (by_interp*b_perp1z - bz_interp*b_perp1y)
+#wut?        b_perp2y = (bz_interp*b_perp1x - bx_interp*b_perp1z)
+#wut?        b_perp2z = (bx_interp*b_perp1y - by_interp*b_perp1x)
+#wut?        b_perpmag = (b_perp2x**2+b_perp2y**2+b_perp2z**2)**.5
+#wut?        b_perp2x = b_perp2x/b_perpmag
+#wut?        b_perp2y = b_perp2y/b_perpmag
+#wut?        b_perp2z = b_perp2z/b_perpmag
+#wut?
+#wut?        velo={}
+#wut?        for species in self.species:
+#wut?            velo[species] = {}
+#wut?
+#wut?            velo[species]['par']   = (bx_interp*self.particles[species]['vx']+by_interp*self.particles[species]['vy']+bz_interp*self.particles[species]['vz'])/bmag_interp
+#wut?            velo[species]['perp1'] = self.particles[species]['vx']*b_perp1x+self.particles[species]['vy']*b_perp1y+self.particles[species]['vz']*b_perp1z
+#wut?            velo[species]['perp2'] = self.particles[species]['vx']*b_perp2x+self.particles[species]['vy']*b_perp2y+self.particles[species]['vz']*b_perp2z
+#wut?
+#wut?        return_hist_dict = {}
+#wut?        for species in self.species:
+#wut?            return_hist_dict[species] = []
+#wut?
+#wut?        for species in velo.keys():
+#wut?            H, xedges, yedges = np.histogram2d(velo[species]['par'],velo[species]['perp1'],**kwargs)
+#wut?# H needs to be rotated and flipped
+#wut?            H = np.rot90(H)
+#wut?            H = np.flipud(H)
+#wut?            return_hist_dict[species].append(['Parallel vs Perp 1 (+zy)',H,xedges,yedges])
+#wut?
+#wut?            H, xedges, yedges = np.histogram2d(velo[species]['par'],velo[species]['perp2'],**kwargs)
+#wut?            H = np.rot90(H)
+#wut?            H = np.flipud(H)
+#wut?            return_hist_dict[species].append(['Parallel vs Perp 2',H,xedges,yedges])
+#wut?
+#wut?            H, xedges, yedges = np.histogram2d(velo[species]['perp1'],velo[species]['perp2'],**kwargs)
+#wut?            H = np.rot90(H)
+#wut?            H = np.flipud(H)
+#wut?            return_hist_dict[species].append(['Perp 1 (+zy) vs Perp 2',H,xedges,yedges])
+#wut?
+#wut?# Mask zeros
+#wut?         #Hmasked = np.ma.masked_where(H==0,H)
+#wut?
+#wut?        return return_hist_dict
+
+
+    def _vdist_pitch(self,**kwargs): 
+
+        if not kwargs.has_key('pa'): pa = 90. #pa = pitch_angle, but I am lazy
+        else: pa = kwargs.pop('pa') 
+        if not kwargs.has_key('dpa'): dpa = 5.
+        else: dpa = kwargs.pop('dpa') 
+        
+        delx = self.param_dict['lx']*1.0/self.param_dict['pex']/self.param_dict['nx']
+        dely = self.param_dict['ly']*1.0/(self.param_dict['pey']*self.param_dict['ny'])
+
+        velo={}
+        return_hist_dict = {}
+        for species in self.species:
+
+            xind = (np.floor((self.particles[species]['x']-delx/2.0)/delx)).astype(int)
+            yind = (np.floor((self.particles[species]['y']-dely/2.0)/dely)).astype(int)
+
+            wx = (self.particles[species]['x']-delx/2.0)%delx
+            wy = (self.particles[species]['y']-dely/2.0)%dely
+
+            partbx = wx     *wy     *self.dump_field_dict['bx'][xind.tolist()    ,yind.tolist()] + \
+                     (1.-wx)*wy     *self.dump_field_dict['bx'][(xind+1).tolist(),yind.tolist()] + \
+                     wx     *(1.-wy)*self.dump_field_dict['bx'][xind.tolist()    ,(yind+1).tolist()] + \
+                     (1.-wx)*(1.-wy)*self.dump_field_dict['bx'][(xind+1).tolist(),(yind+1).tolist()] 
+
+            partby = wx     *wy     *self.dump_field_dict['by'][xind.tolist()    ,yind.tolist()] + \
+                     (1.-wx)*wy     *self.dump_field_dict['by'][(xind+1).tolist(),yind.tolist()] + \
+                     wx     *(1.-wy)*self.dump_field_dict['by'][xind.tolist()    ,(yind+1).tolist()] + \
+                     (1.-wx)*(1.-wy)*self.dump_field_dict['by'][(xind+1).tolist(),(yind+1).tolist()] 
+
+            partbz = wx     *wy     *self.dump_field_dict['bz'][xind.tolist()    ,yind.tolist()] + \
+                     (1.-wx)*wy     *self.dump_field_dict['bz'][(xind+1).tolist(),yind.tolist()] + \
+                     wx     *(1.-wy)*self.dump_field_dict['bz'][xind.tolist()    ,(yind+1).tolist()] + \
+                     (1.-wx)*(1.-wy)*self.dump_field_dict['bz'][(xind+1).tolist(),(yind+1).tolist()] 
+
+            vmag = np.sqrt(self.particles[species]['vx']**2+self.particles[species]['vy']**2+self.particles[species]['vz']**2)
+            vpar = (self.particles[species]['vx']*partbx+self.particles[species]['vy']*partby+self.particles[species]['vz']*partbz)/np.sqrt(partbx**2+partby**2+partbz**2)
+
+            pitch_angle = np.arccos(vpar/vmag)/np.pi*180.
+
+            subpartind = np.where(abs(pitch_angle - pa) < dpa)
+
+
+            subpart = self.particles[species][subpartind]
+            pitch_angle = pitch_angle[subpartind] 
+            partbx = partbx[subpartind]
+            partby = partby[subpartind]
+            partbz = partbz[subpartind]
+
+            bp11 = -1.0*partbz/np.sqrt(partbx**2 + partbz**2)
+            bp12 = 0.0*partby
+            bp13 = partbx/np.sqrt(partbx**2 + partbz**2)
+
+            bp21 = (partby*bp13 - partbz*bp12)/np.sqrt(partbx**2+partby**2+partbz**2)
+            bp22 = (partbz*bp11 - partbx*bp13)/np.sqrt(partbx**2+partby**2+partbz**2)
+            bp23 = (partbx*bp12 - partby*bp11)/np.sqrt(partbx**2+partby**2+partbz**2)
+            
+            print 'Total %s in pitch angle range are: %i'%(species,len(subpart))
+
+            veloperp1 = subpart['vx']*bp11+subpart['vy']*bp12+subpart['vz']*bp13
+            veloperp2 = subpart['vx']*bp21+subpart['vy']*bp22+subpart['vz']*bp23
+
+            return_hist_dict[species] = []
+            #if kwargs.has_key('range'):
+            H, xedges, yedges = np.histogram2d(veloperp1,veloperp2,**kwargs)
+            #else:
+            #    H, xedges, yedges = np.histogram2d(veloperp1,veloperp2)
+            H = np.rot90(H)
+            H = np.flipud(H)
+            return_hist_dict[species].append(H)
+            return_hist_dict[species].append(xedges)
+            return_hist_dict[species].append(yedges)
+
+
+        return return_hist_dict
 
     def _vdist_2d_par(self,**kwargs):
-        #qc#print 'Calculating B field'
-        # this version doent work 
-        #bx_interp = self.interp_field(self.dump_field_dict['bx'],self.param_dict['lx'],self.param_dict['ly'],self._r0[0],self._r0[1])
-        #by_interp = self.interp_field(self.dump_field_dict['by'],self.param_dict['lx'],self.param_dict['ly'],self._r0[0],self._r0[1])
-        #bz_interp = self.interp_field(self.dump_field_dict['bz'],self.param_dict['lx'],self.param_dict['ly'],self._r0[0],self._r0[1])
+        """
+        Colby you are sooooo  dumb
+        right now the pitch version of this code dots every partical with its local B
+        And this just dots them all with a constant B, which seems dumb, you should fix this!
+        """
         bx_interp = self.interp_field(self.dump_field_dict['bx'],self.param_dict['lx'],self.param_dict['ly'],self._r0)
         by_interp = self.interp_field(self.dump_field_dict['by'],self.param_dict['lx'],self.param_dict['ly'],self._r0)
         bz_interp = self.interp_field(self.dump_field_dict['bz'],self.param_dict['lx'],self.param_dict['ly'],self._r0)
@@ -376,27 +495,18 @@ class p3d_dump(object):
             return_hist_dict[species] = []
 
         for species in velo.keys():
-            if kwargs.has_key('range'):
-                H, xedges, yedges = np.histogram2d(velo[species]['par'],velo[species]['perp1'],**kwargs)
-            else:
-                H, xedges, yedges = np.histogram2d(velo[species]['par'],velo[species]['perp1'])
+            H, xedges, yedges = np.histogram2d(velo[species]['par'],velo[species]['perp1'],**kwargs)
 # H needs to be rotated and flipped
             H = np.rot90(H)
             H = np.flipud(H)
             return_hist_dict[species].append(['Parallel vs Perp 1 (+zy)',H,xedges,yedges])
 
-            if kwargs.has_key('range'):
-                H, xedges, yedges = np.histogram2d(velo[species]['par'],velo[species]['perp2'],**kwargs)
-            else:
-                H, xedges, yedges = np.histogram2d(velo[species]['par'],velo[species]['perp2'])
+            H, xedges, yedges = np.histogram2d(velo[species]['par'],velo[species]['perp2'],**kwargs)
             H = np.rot90(H)
             H = np.flipud(H)
             return_hist_dict[species].append(['Parallel vs Perp 2',H,xedges,yedges])
 
-            if kwargs.has_key('range'):
-                H, xedges, yedges = np.histogram2d(velo[species]['perp1'],velo[species]['perp2'],**kwargs)
-            else:
-                H, xedges, yedges = np.histogram2d(velo[species]['perp1'],velo[species]['perp2'])
+            H, xedges, yedges = np.histogram2d(velo[species]['perp1'],velo[species]['perp2'],**kwargs)
             H = np.rot90(H)
             H = np.flipud(H)
             return_hist_dict[species].append(['Perp 1 (+zy) vs Perp 2',H,xedges,yedges])
@@ -487,23 +597,13 @@ class p3d_dump(object):
         yproc_lb = int(np.floor(1.0*self.param_dict['pey']*ylb/self.param_dict['ly']))
         #yproc_lb = int(np.floor(1.0*self.param_dict['pey']*ylb/self.param_dict['ly']))*2 #Uncomment for yishin
         #xproc_ub = (int(np.floor(1.0*self.param_dict['pex']*xub/self.param_dict['lx']))+1)%int(self.param_dict['nchannels'])
+
+
+        if abs(xub - self.param_dict['lx']) < abs(np.spacing(2)): 
+            xub = self.param_dict['lx'] - np.spacing(2)
         xproc_ub = (int(np.floor(1.0*self.param_dict['pex']*xub/self.param_dict['lx'])))%self.param_dict['nchannels'] +1
         yproc_ub = int(np.floor(1.0*self.param_dict['pey']*yub/self.param_dict['ly'])) 
         #yproc_ub = int(np.floor(1.0*self.param_dict['pey']*yub/self.param_dict['ly']))*2 #Uncomment for yishin
-
-#db#        print '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
-#db#        print 'X,Yulb'
-#db#        print xlb
-#db#        print xub
-#db#        print ylb
-#db#        print yub
-#db#        print '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
-#db#        print 'X,Yproc ulb'
-#db#        print xproc_lb
-#db#        print xproc_ub
-#db#        print yproc_lb
-#db#        print yproc_ub
-#db#        print '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
 
         if xproc_lb > xproc_ub:
             print 'Lower Bound greater than upper bound! That is obviously an issue!'
@@ -554,10 +654,10 @@ class p3d_dump(object):
 
 # We need to looop over Ions and Electrons
             for species in self.species:
-                if species == 'i':
-                    print '\tSelecting Ions'
-                else:
-                    print '\tSelecting Electrons'
+                #if species == 'i':
+                #    print '\tSelecting Ions'
+                #else:
+                #    print '\tSelecting Electrons'
 # second for loop over the py
 # also just doing electron for right now
                 for yprocs_index in yprocs_2load:
@@ -601,359 +701,12 @@ class p3d_dump(object):
                     else: 
                         upper_xboundry_index = -1#np.searchsorted(temp_dump_xproc['x'],xub)
                     temp_dump_pruned[species].append(temp_dump_xproc[lower_xboundry_index:upper_xboundry_index])
-
         for species in self.species:
             temp_dump_pruned[species] = np.concatenate(temp_dump_pruned[species])
             print 'Total %s in box are: %i'%(species,len(temp_dump_pruned[species]))
         return temp_dump_pruned
 
 
-########################################################################################################################
-################################################### Note Coded Yet!!! ##################################################
-########################################################################################################################
-#c# #---------------------------------------------------------------------------------------------------------------
-#c# #   Method      : vdist_1d
-#c# #
-#c# #   Discription : This method accepts a point and a width in simulation units (c/wpi) to define a box.
-#c# #               : In that box we bin all of the particles to form the effective distrobution function
-#c# #
-#c# #   Args        : location [x,y] ( where you want the center of you box to be located at)
-#c# #               : width [x,y] (the width of the box to bin particles 
-#c# #               : dump_num (This spesifies the particular runs dump file 
-#c# #
-#c# #   Comments    : It would be pretty easy and potential usefull to allow this to wrap around the edges
-#c# #               : so we can pick zero as a boundry and the code will know what todo.
-#c# #---------------------------------------------------------------------------------------------------------------
-#c#     #def vdist_1d([location, width,dump_index]):
-#c#     def vdist_1d(self,r_simUnit=[76.8,76.8],x_width_simUnit=1.0,dump_num='000',bins=200,vflag=''):
-#c# # First we handel the input
-#c#         x_simUnit = r_simUnit[0]
-#c#         y_simUnit = r_simUnit[0]
-#c#         if isinstance(x_width_simUnit,list): # Square box is assumed
-#c#             y_width_simUnit = x_width_simUnit[1]
-#c#             x_width_simUnit = x_width_simUnit[0]
-#c#         else:
-#c#             y_width_simUnit = x_width_simUnit
-#c#         if len(vflag) > 0 and vflag[0].lower() == 'v':
-#c#             verbose = 1
-#c#             vflag = vflag[1:]
-#c#         else: 
-#c#             verbose = 0
-#c#         if verbose:
-#c#             def verboseprint(*args):
-#c#                 for arg in args:
-#c#                     print arg,
-#c#                 print
-#c#         else:   
-#c#             verboseprint = lambda *a: None      # do-nothing
-#c# 
-#c# # Calling get particles in box to make the vdist
-#c#         verboseprint('Reading Ions and Electrons from the Dump File')
-#c#         particles = self.get_part_in_box([r_simUnit,[x_width_simUnit,y_width_simUnit],dump_num,vflag])
-#c# 
-#c# # Here we are generating 3 histograms from the particles we read
-#c#         verboseprint('Generating Histograms')
-#c#         return_histx=[0.,0.]
-#c#         return_histy=[0.,0.]
-#c#         return_histz=[0.,0.]
-#c#         return_hist_dict={}
-#c#         centerx=[0.,0.]
-#c#         centery=[0.,0.]
-#c#         centerz=[0.,0.]
-#c# 
-#c# # the vx hist
-#c#         return_histx[0],centerx[0] = np.histogram(particles[0]['vx'], bins=bins)
-#c#         return_histx[1],centerx[1] = np.histogram(particles[1]['vx'], bins=bins)
-#c#         centerx[0] = (centerx[0][1:]+centerx[0][:-1])/2.
-#c#         centerx[1] = (centerx[1][1:]+centerx[1][:-1])/2.
-#c#         return_hist_dict['vx'] = [return_histx,centerx]
-#c# # the vy hist
-#c#         return_histy[0],centery[0] = np.histogram(particles[0]['vy'], bins=bins)
-#c#         return_histy[1],centery[1] = np.histogram(particles[1]['vy'], bins=bins)
-#c#         centery[0] = (centery[0][1:]+centery[0][:-1])/2.
-#c#         centery[1] = (centery[1][1:]+centery[1][:-1])/2.
-#c#         return_hist_dict['vy'] = [return_histy,centery]
-#c# # the vz hist
-#c#         return_histz[0],centerz[0] = np.histogram(particles[0]['vz'], bins=bins)
-#c#         return_histz[1],centerz[1] = np.histogram(particles[1]['vz'], bins=bins)
-#c#         centerz[0] = (centerz[0][1:]+centerz[0][:-1])/2.
-#c#         centerz[1] = (centerz[1][1:]+centerz[1][:-1])/2.
-#c#         return_hist_dict['vz'] = [return_histz,centerz]
-#c# 
-#c#         return return_hist_dict
-#c# 
-#c# #---------------------------------------------------------------------------------------------------------------
-#c# #   Method      : vdist_1d_par
-#c# #
-#c# #   Discription : This method accepts a point and a width in simulation units (c/wpi) to define a box.
-#c# #               : In that box we bin all of the particles to form the effective distrobution function
-#c# #
-#c# #   Args        : location [x,y] ( where you want the center of you box to be located at)
-#c# #               : width [x,y] (the width of the box to bin particles 
-#c# #               : dump_num (This spesifies the particular runs dump file 
-#c# #
-#c# #   Comments    : It would be pretty easy and potential usefull to allow this to wrap around the edges
-#c# #               : so we can pick zero as a boundry and the code will know what todo.
-#c# #---------------------------------------------------------------------------------------------------------------
-#c#     #def vdist_1d_par([location, width,dump_index]):
-#c#     def vdist_1d_par(self,r_simUnit=[76.8,76.8],x_width_simUnit=1.0,dump_num='000',bins=51,vflag=''):
-#c# # First we handel the input
-#c#         x_simUnit = r_simUnit[0]
-#c#         y_simUnit = r_simUnit[0]
-#c#         if isinstance(x_width_simUnit,list): # Square box is assumed
-#c#             y_width_simUnit = x_width_simUnit[1]
-#c#             x_width_simUnit = x_width_simUnit[0]
-#c#         else:
-#c#             y_width_simUnit = x_width_simUnit
-#c#         if len(vflag) > 0 and vflag[0].lower() == 'v':
-#c#             verbose = 1
-#c#             vflag = vflag[1:]
-#c#         else: 
-#c#             verbose = 0
-#c#         if verbose:
-#c#             def verboseprint(*args):
-#c#                 for arg in args:
-#c#                     print arg,
-#c#                 print
-#c#         else:   
-#c#             verboseprint = lambda *a: None      # do-nothing
-#c# 
-#c# # Calling get particles in box to make the vdist
-#c#         verboseprint('Reading Ions and Electrons from the Dump File')
-#c#         particles = self.get_part_in_box([r_simUnit,[x_width_simUnit,y_width_simUnit],dump_num,vflag])
-#c# # Reading in fields to calculate vpar
-#c#         verboseprint('Reading in the Fields form the Dump File')
-#c#         dump_field_dict = self.read_fields_from_dump([dump_num])
-#c# # Now there are two ways to do this, a faster and a slower
-#c# # Faster: just take the average B field and and use that
-#c# #         for every particle
-#c# # Slower: Use an interpolated Bfield for each point
-#c# #
-#c# # Right now im only coding the faster one
-#c#         verboseprint('Calculating B field')
-#c#         
-#c#         bx_interp = interp_field(dump_field_dict['bx'],self.param_dict['lx'],self.param_dict['ly'],r_simUnit[0],r_simUnit[1])
-#c#         by_interp = interp_field(dump_field_dict['by'],self.param_dict['lx'],self.param_dict['ly'],r_simUnit[0],r_simUnit[1])
-#c#         bz_interp = interp_field(dump_field_dict['bz'],self.param_dict['lx'],self.param_dict['ly'],r_simUnit[0],r_simUnit[1])
-#c#         bmag_interp = (bx_interp**2+by_interp**2+bz_interp**2)**(.5)
-#c# 
-#c#         b_perp1y = -1.*bz_interp/(by_interp**2+bz_interp**2)**(.5)
-#c#         b_perp1z = by_interp/(by_interp**2+bz_interp**2)**(.5)
-#c# 
-#c#         b_perp2x = (by_interp*b_perp1z - bz_interp*b_perp1y)
-#c#         b_perp2y = (-1.*bx_interp*b_perp1z)
-#c#         b_perp2z = (bx_interp*b_perp1y)
-#c#         b_perpmag = ((by_interp*b_perp1z - bz_interp*b_perp1y)**2+(bx_interp*b_perp1z)**2+(bx_interp*b_perp1y)**2)**(.5)
-#c#         b_perp2x = b_perp2x/b_perpmag
-#c#         b_perp2y = b_perp2y/b_perpmag
-#c#         b_perp2z = b_perp2z/b_perpmag
-#c#         
-#c#         verboseprint('Rotating Velocties')
-#c# # Also just doing the electons to start off with 
-#c#         vpar = (bx_interp*particles[1]['vx']+by_interp*particles[1]['vy']+bz_interp*particles[1]['vz'])/bmag_interp
-#c#         vperp1 = particles[1]['vy']*b_perp1y+particles[1]['vz']*b_perp1z
-#c#         vperp2 = particles[1]['vx']*b_perp2x+particles[1]['vy']*b_perp2y+particles[1]['vz']*b_perp2z
-#c# 
-#c#         verboseprint('Generating Histograms')
-#c# 
-#c#         return_hist_dict = {}
-#c#         return_hist = [0.,0.]
-#c#         extent = [[0.,0.,0.,0.],[0.,0.,0.,0.]]
-#c#         return_hist[0],xedge,yedge = np.histogram2d(particles[0]['vx'], particles[0]['vy'], bins=bins)
-#c#         extent[0] = [xedge[0],xedge[-1],yedge[0],yedge[-1]]
-#c#         return_hist[1],extent[1] = np.histogram(vpar,bins=bins)
-#c#         #extent[1] = [xedge[0],xedge[-1],yedge[0],yedge[-1]]
-#c#         return_hist_dict = [return_hist[1],(extent[1][1:]+extent[1][:-1])/2.]
-#c# #@# # the vx vs vy hist
-#c# #@#         return_hist[0],xedge,yedge = np.histogram2d(particles[0]['vx'], particles[0]['vy'], bins=bins)
-#c# #@#         extent[0] = [xedge[0],xedge[-1],yedge[0],yedge[-1]]
-#c# #@#         return_hist[1],xedge,yedge = np.histogram2d(particles[1]['vx'], particles[1]['vy'], bins=bins)
-#c# #@#         extent[1] = [xedge[0],xedge[-1],yedge[0],yedge[-1]]
-#c# #@#         return_hist_dict['vxy'] = [return_hist,extent]
-#c# #@# # the vx vs vz hist
-#c# #@#         return_hist[0],xedge,yedge = np.histogram2d(particles[0]['vx'], particles[0]['vz'], bins=bins)
-#c# #@#         extent[0] = [xedge[0],xedge[-1],yedge[0],yedge[-1]]
-#c# #@#         return_hist[1],xedge,yedge = np.histogram2d(particles[1]['vx'], particles[1]['vz'], bins=bins)
-#c# #@#         extent[1] = [xedge[0],xedge[-1],yedge[0],yedge[-1]]
-#c# #@#         return_hist_dict['vxz'] = [return_hist,extent]
-#c# #@# # the vy vs vz hist
-#c# #@#         return_hist[0],xedge,yedge = np.histogram2d(particles[0]['vy'], particles[0]['vz'], bins=bins)
-#c# #@#         extent[0] = [xedge[0],xedge[-1],yedge[0],yedge[-1]]
-#c# #@#         return_hist[1],xedge,yedge = np.histogram2d(particles[1]['vy'], particles[1]['vz'], bins=bins)
-#c# #@#         extent[1] = [xedge[0],xedge[-1],yedge[0],yedge[-1]]
-#c# #@#         return_hist_dict['vyz'] = [return_hist,extent]
-#c# 
-#c#         return return_hist_dict
-#c# 
-#c# #---------------------------------------------------------------------------------------------------------------
-#c# #   Method      : vdist_2d
-#c# #
-#c# #   Discription : This method accepts a point and a width in simulation units (c/wpi) to define a box.
-#c# #               : In that box we bin all of the particles to form the effective distrobution function
-#c# #
-#c# #   Args        : location [x,y] ( where you want the center of you box to be located at)
-#c# #               : width [x,y] (the width of the box to bin particles 
-#c# #               : dump_num (This spesifies the particular runs dump file 
-#c# #
-#c# #   Comments    : It would be pretty easy and potential usefull to allow this to wrap around the edges
-#c# #               : so we can pick zero as a boundry and the code will know what todo.
-#c# #---------------------------------------------------------------------------------------------------------------
-#c#     #def vdist_2d([location, width,dump_index]):
-#c#     def vdist_2d(self,r_simUnit=[76.8,76.8],x_width_simUnit=1.0,dump_num='000',bins=51,vflag=''):
-#c# # First we handel the input
-#c#         x_simUnit = r_simUnit[0]
-#c#         y_simUnit = r_simUnit[0]
-#c#         if isinstance(x_width_simUnit,list): # Square box is assumed
-#c#             y_width_simUnit = x_width_simUnit[1]
-#c#             x_width_simUnit = x_width_simUnit[0]
-#c#         else:
-#c#             y_width_simUnit = x_width_simUnit
-#c#         if len(vflag) > 0 and vflag[0].lower() == 'v':
-#c#             verbose = 1
-#c#             vflag = vflag[1:]
-#c#         else: 
-#c#             verbose = 0
-#c#         if verbose:
-#c#             def verboseprint(*args):
-#c#                 for arg in args:
-#c#                     print arg,
-#c#                 print
-#c#         else:   
-#c#             verboseprint = lambda *a: None      # do-nothing
-#c# 
-#c# # Calling get particles in box to make the vdist
-#c#         verboseprint('Reading Ions and Electrons from the Dump File')
-#c#         particles = self.get_part_in_box([r_simUnit,[x_width_simUnit,y_width_simUnit],dump_num,vflag])
-#c# 
-#c# # Here we are generating 3 histograms from the particles we read
-#c#         verboseprint('Generating Histograms')
-#c#         return_hist_dict = {}
-#c#         return_histxy = [0.,0.]
-#c#         extentxy = [[0.,0.,0.,0.],[0.,0.,0.,0.]]
-#c#         return_histxz = [0.,0.]
-#c#         extentxz = [[0.,0.,0.,0.],[0.,0.,0.,0.]]
-#c#         return_histyz = [0.,0.]
-#c#         extentyz = [[0.,0.,0.,0.],[0.,0.,0.,0.]]
-#c# 
-#c# # the vx vs vy hist
-#c#         return_histxy[0],xedge,yedge = np.histogram2d(particles[0]['vx'], particles[0]['vy'], bins=bins)
-#c#         extentxy[0] = [xedge[0],xedge[-1],yedge[0],yedge[-1]]
-#c#         return_histxy[1],xedge,yedge = np.histogram2d(particles[1]['vx'], particles[1]['vy'], bins=bins)
-#c#         extentxy[1] = [xedge[0],xedge[-1],yedge[0],yedge[-1]]
-#c#         return_hist_dict['vxy'] = [return_histxy,extentxy]
-#c# # the vx vs vz hist
-#c#         return_histxz[0],xedge,yedge = np.histogram2d(particles[0]['vx'], particles[0]['vz'], bins=bins)
-#c#         extentxz[0] = [xedge[0],xedge[-1],yedge[0],yedge[-1]]
-#c#         return_histxz[1],xedge,yedge = np.histogram2d(particles[1]['vx'], particles[1]['vz'], bins=bins)
-#c#         extentxz[1] = [xedge[0],xedge[-1],yedge[0],yedge[-1]]
-#c#         return_hist_dict['vxz'] = [return_histxz,extentxz]
-#c# # the vy vs vz hist
-#c#         return_histyz[0],xedge,yedge = np.histogram2d(particles[0]['vy'], particles[0]['vz'], bins=bins)
-#c#         extentyz[0] = [xedge[0],xedge[-1],yedge[0],yedge[-1]]
-#c#         return_histyz[1],xedge,yedge = np.histogram2d(particles[1]['vy'], particles[1]['vz'], bins=bins)
-#c#         extentyz[1] = [xedge[0],xedge[-1],yedge[0],yedge[-1]]
-#c#         return_hist_dict['vyz'] = [return_histyz,extentyz]
-#c# 
-#c#         return return_hist_dict
-#c# 
-#c# #---------------------------------------------------------------------------------------------------------------
-#c# #   Method      : vdist_2d_par
-#c# #
-#c# #   Discription : This method accepts a point and a width in simulation units (c/wpi) to define a box.
-#c# #               : In that box we bin all of the particles to form the effective distrobution function
-#c# #
-#c# #   Args        : location [x,y] ( where you want the center of you box to be located at)
-#c# #               : width [x,y] (the width of the box to bin particles 
-#c# #               : dump_num (This spesifies the particular runs dump file 
-#c# #
-#c# #   Returns     : return_hist_dict['axis'][i/e][hist_array]
-#c# #               :   'axis'  slecets the data for the 2d projection of the distabution function 
-#c# #                   'axis' = 'parperp1', 'parperp1', 'perp1perp2'
-#c# #                   i/e is an int that selects either the electron or ion data. i = 0, e = 1
-#c# #                   The rest is just an object that is returned directly from the histogram2d method
-#c# #
-#c# #
-#c# #   Comments    : It would be pretty easy and potential usefull to allow this to wrap around the edges
-#c# #               : so we can pick zero as a boundry and the code will know what todo.
-#c# #---------------------------------------------------------------------------------------------------------------
-#c#     #def vdist_2d_par([location, width,dump_index]):
-#c#     def vdist_2d_par(self,r_simUnit=[76.8,76.8],x_width_simUnit=1.0,dump_num='000',bins=51,vflag=''):
-#c# # First we handel the input
-#c#         x_simUnit = r_simUnit[0]
-#c#         y_simUnit = r_simUnit[0]
-#c#         if isinstance(x_width_simUnit,list): # Square box is assumed
-#c#             y_width_simUnit = x_width_simUnit[1]
-#c#             x_width_simUnit = x_width_simUnit[0]
-#c#         else:
-#c#             y_width_simUnit = x_width_simUnit
-#c#         if len(vflag) > 0 and vflag[0].lower() == 'v':
-#c#             verbose = 1
-#c#             vflag = vflag[1:]
-#c#         else: 
-#c#             verbose = 0
-#c#         if verbose:
-#c#             def verboseprint(*args):
-#c#                 for arg in args:
-#c#                     print arg,
-#c#                 print
-#c#         else:   
-#c#             verboseprint = lambda *a: None      # do-nothing
-#c# 
-#c# # Calling get particles in box to make the vdist
-#c#         verboseprint('Reading Ions and Electrons from the Dump File')
-#c#         particles = self.get_part_in_box([r_simUnit,[x_width_simUnit,y_width_simUnit],dump_num,vflag])
-#c# # Reading in fields to calculate vpar
-#c#         verboseprint('Reading in the Fields form the Dump File')
-#c#         dump_field_dict = self.read_fields_from_dump([dump_num])
-#c# # Now there are two ways to do this, a faster and a slower
-#c# # Faster: just take the average B field and and use that
-#c# #         for every particle
-#c# # Slower: Use an interpolated Bfield for each point
-#c# #
-#c# # Right now im only coding the faster one
-#c#         verboseprint('Calculating B field')
-#c#         
-#c#         bx_interp = interp_field(dump_field_dict['bx'],self.param_dict['lx'],self.param_dict['ly'],r_simUnit[0],r_simUnit[1])
-#c#         by_interp = interp_field(dump_field_dict['by'],self.param_dict['lx'],self.param_dict['ly'],r_simUnit[0],r_simUnit[1])
-#c#         bz_interp = interp_field(dump_field_dict['bz'],self.param_dict['lx'],self.param_dict['ly'],r_simUnit[0],r_simUnit[1])
-#c#         bmag_interp = (bx_interp**2+by_interp**2+bz_interp**2)**.5
-#c# 
-#c#         if by_interp > 0.:
-#c#             b_perp1x = 0.
-#c#             b_perp1y = -1.*bz_interp/(bz_interp**2 + by_interp**2)**(.5)
-#c#             b_perp1z = by_interp/(bx_interp**2 + by_interp**2)**(.5)
-#c#         else:
-#c#             b_perp1x = 0.
-#c#             b_perp1y = bz_interp/(bz_interp**2 + by_interp**2)**(.5)
-#c#             b_perp1z = -1.*by_interp/(bx_interp**2 + by_interp**2)**(.5)
-#c# 
-#c#         b_perp2x = (by_interp*b_perp1z - bz_interp*b_perp1y)
-#c#         b_perp2y = (bz_interp*b_perp1x - bx_interp*b_perp1z)
-#c#         b_perp2z = (bx_interp*b_perp1y - by_interp*b_perp1x)
-#c#         b_perpmag = (b_perp2x**2+b_perp2y**2+b_perp2z**2)**.5
-#c#         b_perp2x = b_perp2x/b_perpmag
-#c#         b_perp2y = b_perp2y/b_perpmag
-#c#         b_perp2z = b_perp2z/b_perpmag
-#c# 
-#c#         verboseprint('Rotating Velocties')
-#c# # Also just doing the electons to start off with 
-#c#         vpar_i = (bx_interp*particles[0]['vx']+by_interp*particles[0]['vy']+bz_interp*particles[0]['vz'])/bmag_interp
-#c#         vperp1_i = particles[0]['vx']*b_perp1x+particles[0]['vy']*b_perp1y+particles[0]['vz']*b_perp1z
-#c#         vperp2_i = particles[0]['vx']*b_perp2x+particles[0]['vy']*b_perp2y+particles[0]['vz']*b_perp2z
-#c# 
-#c#         vpar_e = (bx_interp*particles[1]['vx']+by_interp*particles[1]['vy']+bz_interp*particles[1]['vz'])/bmag_interp
-#c#         vperp1_e = particles[1]['vx']*b_perp1x+particles[1]['vy']*b_perp1y+particles[1]['vz']*b_perp1z
-#c#         vperp2_e = particles[1]['vx']*b_perp2x+particles[1]['vy']*b_perp2y+particles[1]['vz']*b_perp2z
-#c# 
-#c#         verboseprint('Generating Histograms')
-#c# 
-#c#         return_hist_dict = {}
-#c#         
-#c#         return_hist_dict['parperp1'] = [np.histogram2d(vperp1_i,vpar_i, bins=bins),np.histogram2d(vperp1_e,vpar_e, bins=bins)]
-#c#         return_hist_dict['parperp2'] = [np.histogram2d(vperp2_i,vpar_i, bins=bins),np.histogram2d(vperp2_e,vpar_e, bins=bins)]
-#c#         return_hist_dict['perp1perp2'] = [np.histogram2d(vperp2_i,vperp1_i, bins=bins),np.histogram2d(vperp2_e,vperp1_e, bins=bins)]
-#c# 
-#c#         return return_hist_dict
 
     def _num_to_ext(self,num):
         if type(num) is str: 
