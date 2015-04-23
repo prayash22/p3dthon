@@ -499,17 +499,17 @@ class p3d_dump(object):
 # H needs to be rotated and flipped
             H = np.rot90(H)
             H = np.flipud(H)
-            return_hist_dict[species].append(['Parallel vs Perp 1 (+zy)',H,xedges,yedges])
+            return_hist_dict[species].append(['V_Parallel vs V_Perp 1 (+zy)',H,xedges,yedges])
 
             H, xedges, yedges = np.histogram2d(velo[species]['par'],velo[species]['perp2'],**kwargs)
             H = np.rot90(H)
             H = np.flipud(H)
-            return_hist_dict[species].append(['Parallel vs Perp 2',H,xedges,yedges])
+            return_hist_dict[species].append(['V_Parallel vs V_Perp 2',H,xedges,yedges])
 
             H, xedges, yedges = np.histogram2d(velo[species]['perp1'],velo[species]['perp2'],**kwargs)
             H = np.rot90(H)
             H = np.flipud(H)
-            return_hist_dict[species].append(['Perp 1 (+zy) vs Perp 2',H,xedges,yedges])
+            return_hist_dict[species].append(['V_Perp 1 (+zy) vs V_Perp 2',H,xedges,yedges])
 
 # Mask zeros
          #Hmasked = np.ma.masked_where(H==0,H)
@@ -531,17 +531,17 @@ class p3d_dump(object):
 # H needs to be rotated and flipped
             H = np.rot90(H)
             H = np.flipud(H)
-            return_hist_dict[species].append(['X vs Y',H,xedges,yedges])
+            return_hist_dict[species].append(['V_X vs V_Y',H,(xedges[1:]+xedges[:-1])/2.,(yedges[1:]+yedges[:-1])/2.])
 
             H, xedges, yedges = np.histogram2d(self.particles[species]['vx'],self.particles[species]['vz'],**kwargs)
             H = np.rot90(H)
             H = np.flipud(H)
-            return_hist_dict[species].append(['X vs Z',H,xedges,yedges])
+            return_hist_dict[species].append(['V_X vs V_Z',H,(xedges[1:]+xedges[:-1])/2.,(yedges[1:]+yedges[:-1])/2.])
 
             H, xedges, yedges = np.histogram2d(self.particles[species]['vy'],self.particles[species]['vz'],**kwargs)
             H = np.rot90(H)
             H = np.flipud(H)
-            return_hist_dict[species].append(['Y vs Z',H,xedges,yedges])
+            return_hist_dict[species].append(['V_Y vs V_Z',H,(xedges[1:]+xedges[:-1])/2.,(yedges[1:]+yedges[:-1])/2.])
 
 # Mask zeros
          #Hmasked = np.ma.masked_where(H==0,H)
