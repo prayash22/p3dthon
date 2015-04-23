@@ -499,17 +499,17 @@ class p3d_dump(object):
 # H needs to be rotated and flipped
             H = np.rot90(H)
             H = np.flipud(H)
-            return_hist_dict[species].append(['Parallel vs Perp 1 (+zy)',H,xedges,yedges])
+            return_hist_dict[species].append(['V_Parallel vs V_Perp 1 (+zy)',H,xedges,yedges])
 
             H, xedges, yedges = np.histogram2d(velo[species]['par'],velo[species]['perp2'],**kwargs)
             H = np.rot90(H)
             H = np.flipud(H)
-            return_hist_dict[species].append(['Parallel vs Perp 2',H,xedges,yedges])
+            return_hist_dict[species].append(['V_Parallel vs V_Perp 2',H,xedges,yedges])
 
             H, xedges, yedges = np.histogram2d(velo[species]['perp1'],velo[species]['perp2'],**kwargs)
             H = np.rot90(H)
             H = np.flipud(H)
-            return_hist_dict[species].append(['Perp 1 (+zy) vs Perp 2',H,xedges,yedges])
+            return_hist_dict[species].append(['V_Perp 1 (+zy) vs V_Perp 2',H,xedges,yedges])
 
 # Mask zeros
          #Hmasked = np.ma.masked_where(H==0,H)
@@ -531,17 +531,17 @@ class p3d_dump(object):
 # H needs to be rotated and flipped
             H = np.rot90(H)
             H = np.flipud(H)
-            return_hist_dict[species].append(['X vs Y',H,xedges,yedges])
+            return_hist_dict[species].append(['V_X vs V_Y',H,(xedges[1:]+xedges[:-1])/2.,(yedges[1:]+yedges[:-1])/2.])
 
             H, xedges, yedges = np.histogram2d(self.particles[species]['vx'],self.particles[species]['vz'],**kwargs)
             H = np.rot90(H)
             H = np.flipud(H)
-            return_hist_dict[species].append(['X vs Z',H,xedges,yedges])
+            return_hist_dict[species].append(['V_X vs V_Z',H,(xedges[1:]+xedges[:-1])/2.,(yedges[1:]+yedges[:-1])/2.])
 
             H, xedges, yedges = np.histogram2d(self.particles[species]['vy'],self.particles[species]['vz'],**kwargs)
             H = np.rot90(H)
             H = np.flipud(H)
-            return_hist_dict[species].append(['Y vs Z',H,xedges,yedges])
+            return_hist_dict[species].append(['V_Y vs V_Z',H,(xedges[1:]+xedges[:-1])/2.,(yedges[1:]+yedges[:-1])/2.])
 
 # Mask zeros
          #Hmasked = np.ma.masked_where(H==0,H)
@@ -631,8 +631,8 @@ class p3d_dump(object):
 
 # Load in the appropriate Processors
         temp_dump_pruned = {}# List to hold all the particles
-        for cosa in self.species:
-            temp_dump_pruned[cosa] = []
+        for species in self.species:
+            temp_dump_pruned[species] = []
         #first for loop over px
         for xprocs_index in xprocs_2load:
             dump_dat_dict = {}
@@ -663,44 +663,56 @@ class p3d_dump(object):
                 for yprocs_index in yprocs_2load:
                     self._debug = temp_dump_dat 
                     temp_dump_yproc = temp_dump_dat[species][yprocs_index]
-# You only need to sort if you are on the edge processors
-                    if yprocs_index == yprocs_2load[0] or yprocs_index == yprocs_2load[-1]: 
-                        #qc#print '\t\tSorting yproc number '+str(yprocs_index)
-                        sorted_index = temp_dump_dat[species][yprocs_index].argsort(order='y')
-                        temp_dump_yproc = temp_dump_dat[species][yprocs_index][sorted_index]
-# Here we need kind of a complecated if structure to get all the poible cases since
-# we are scaning over muliple processors.
-# If you are on your first y processor then you need to find a lower boundry
-                    if yprocs_index == yprocs_2load[0]: 
-                        #qc#print '\t\t\tFinding lower yboundry index '
-                        lower_yboundry_index = np.searchsorted(temp_dump_yproc['y'],ylb)
-                    else:
-                        lower_yboundry_index = 0#np.searchsorted(temp_dump_yproc['y'],ylb)
-# If you are on your last y processor then you need to find a upper boundry
-                    if yprocs_index == yprocs_2load[-1]: 
-                        #qc#print '\t\t\tFinding upper yboundry index '
-                        upper_yboundry_index = np.searchsorted(temp_dump_yproc['y'],yub)
-                    else:
-                        upper_yboundry_index = -1#np.searchsorted(temp_dump_yproc['y'],yub)
-                    # You only need to sort if you are on the edge processors
-                    temp_dump_xproc = temp_dump_yproc[lower_yboundry_index:upper_yboundry_index]
-                    if xprocs_index == xprocs_2load[0] or xprocs_index == xprocs_2load[-1]: 
-                        #qc#print '\t\tNow sorting x values for remaing data'
-                        sorted_index = temp_dump_xproc.argsort(order='x')
-                        temp_dump_xproc = temp_dump_xproc[sorted_index] 
-# If you are on your first x processor then you need to find a lower boundry
-                    if xprocs_index == xprocs_2load[0]: 
-                        #qc#print '\t\t\tFinding lower xboundry index '
-                        lower_xboundry_index = np.searchsorted(temp_dump_xproc['x'],xlb)
-                    else:
-                        lower_xboundry_index = 0#np.searchsorted(temp_dump_xproc['x'],xlb)
-# If you are on your last x processor then you need to find a upper boundry
-                    if xprocs_index == xprocs_2load[-1]: 
-                        #qc#print '\t\t\tFinding upper xboundry index '
-                        upper_xboundry_index = np.searchsorted(temp_dump_xproc['x'],xub)
-                    else: 
-                        upper_xboundry_index = -1#np.searchsorted(temp_dump_xproc['x'],xub)
-                    temp_dump_pruned[species].append(temp_dump_xproc[lower_xboundry_index:upper_xboundry_index])
+### Lets try somthing new, that might be faster.  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                    temp_index = np.where((temp_dump_dat[species][yprocs_index]['y'] - yub)**2 +
+                    (temp_dump_dat[species][yprocs_index]['y'] - ylb)**2 < (yub-ylb)**2 )
+                    temp_dump_xproc = temp_dump_dat[species][yprocs_index][temp_index]
+
+                    temp_index = np.where((temp_dump_xproc['x'] - xub)**2 +
+                    (temp_dump_xproc['x'] - xlb)**2 < (xub-xlb)**2 )
+
+                    temp_dump_pruned[species].append(temp_dump_xproc[temp_index])
+
+
+#test ### This is how we were sorting this But I think it is MUCH SLOWER
+#test # You only need to sort if you are on the edge processors
+#test                     if yprocs_index == yprocs_2load[0] or yprocs_index == yprocs_2load[-1]: 
+#test                         #qc#print '\t\tSorting yproc number '+str(yprocs_index)
+#test                         sorted_index = temp_dump_dat[species][yprocs_index].argsort(order='y')
+#test                         temp_dump_yproc = temp_dump_dat[species][yprocs_index][sorted_index]
+#test # Here we need kind of a complecated if structure to get all the poible cases since
+#test # we are scaning over muliple processors.
+#test # If you are on your first y processor then you need to find a lower boundry
+#test                     if yprocs_index == yprocs_2load[0]: 
+#test                         #qc#print '\t\t\tFinding lower yboundry index '
+#test                         lower_yboundry_index = np.searchsorted(temp_dump_yproc['y'],ylb)
+#test                     else:
+#test                         lower_yboundry_index = 0#np.searchsorted(temp_dump_yproc['y'],ylb)
+#test # If you are on your last y processor then you need to find a upper boundry
+#test                     if yprocs_index == yprocs_2load[-1]: 
+#test                         #qc#print '\t\t\tFinding upper yboundry index '
+#test                         upper_yboundry_index = np.searchsorted(temp_dump_yproc['y'],yub)
+#test                     else:
+#test                         upper_yboundry_index = -1#np.searchsorted(temp_dump_yproc['y'],yub)
+#test                     # You only need to sort if you are on the edge processors
+#test                     temp_dump_xproc = temp_dump_yproc[lower_yboundry_index:upper_yboundry_index]
+#test                     if xprocs_index == xprocs_2load[0] or xprocs_index == xprocs_2load[-1]: 
+#test                         #qc#print '\t\tNow sorting x values for remaing data'
+#test                         sorted_index = temp_dump_xproc.argsort(order='x')
+#test                         temp_dump_xproc = temp_dump_xproc[sorted_index] 
+#test # If you are on your first x processor then you need to find a lower boundry
+#test                     if xprocs_index == xprocs_2load[0]: 
+#test                         #qc#print '\t\t\tFinding lower xboundry index '
+#test                         lower_xboundry_index = np.searchsorted(temp_dump_xproc['x'],xlb)
+#test                     else:
+#test                         lower_xboundry_index = 0#np.searchsorted(temp_dump_xproc['x'],xlb)
+#test # If you are on your last x processor then you need to find a upper boundry
+#test                     if xprocs_index == xprocs_2load[-1]: 
+#test                         #qc#print '\t\t\tFinding upper xboundry index '
+#test                         upper_xboundry_index = np.searchsorted(temp_dump_xproc['x'],xub)
+#test                     else: 
+#test                         upper_xboundry_index = -1#np.searchsorted(temp_dump_xproc['x'],xub)
+#test                     temp_dump_pruned[species].append(temp_dump_xproc[lower_xboundry_index:upper_xboundry_index])
         for species in self.species:
             temp_dump_pruned[species] = np.concatenate(temp_dump_pruned[species])
             print 'Total %s in box are: %i'%(species,len(temp_dump_pruned[species]))
