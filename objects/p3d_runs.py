@@ -73,10 +73,6 @@ class p3d_run(object):
         11:21:19.671182
         """
 
-	print '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
-	print '~~~~ what is going on?    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
-	print P3DTHON_PATH
-	print '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
         if len(runname) == 0: # Start init prompt
             runname = raw_input("Please enter the runname (or 'help' for other options): ") 
 
