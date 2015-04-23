@@ -299,7 +299,6 @@ class p3d_dump(object):
         if par or Bvec or pitch:
             #qc#print 'Reading in the Fields form the Dump File'
             self.dump_field_dict = self.read_dump_file(fields=True)
-            print 'pitch'
             if pitch:
                 return_hist = self._vdist_pitch(**kwargs)
             elif par:
@@ -377,27 +376,18 @@ class p3d_dump(object):
             return_hist_dict[species] = []
 
         for species in velo.keys():
-            if kwargs.has_key('range'):
-                H, xedges, yedges = np.histogram2d(velo[species]['par'],velo[species]['perp1'],**kwargs)
-            else:
-                H, xedges, yedges = np.histogram2d(velo[species]['par'],velo[species]['perp1'])
+            H, xedges, yedges = np.histogram2d(velo[species]['par'],velo[species]['perp1'],**kwargs)
 # H needs to be rotated and flipped
             H = np.rot90(H)
             H = np.flipud(H)
             return_hist_dict[species].append(['Parallel vs Perp 1 (+zy)',H,xedges,yedges])
 
-            if kwargs.has_key('range'):
-                H, xedges, yedges = np.histogram2d(velo[species]['par'],velo[species]['perp2'],**kwargs)
-            else:
-                H, xedges, yedges = np.histogram2d(velo[species]['par'],velo[species]['perp2'])
+            H, xedges, yedges = np.histogram2d(velo[species]['par'],velo[species]['perp2'],**kwargs)
             H = np.rot90(H)
             H = np.flipud(H)
             return_hist_dict[species].append(['Parallel vs Perp 2',H,xedges,yedges])
 
-            if kwargs.has_key('range'):
-                H, xedges, yedges = np.histogram2d(velo[species]['perp1'],velo[species]['perp2'],**kwargs)
-            else:
-                H, xedges, yedges = np.histogram2d(velo[species]['perp1'],velo[species]['perp2'])
+            H, xedges, yedges = np.histogram2d(velo[species]['perp1'],velo[species]['perp2'],**kwargs)
             H = np.rot90(H)
             H = np.flipud(H)
             return_hist_dict[species].append(['Perp 1 (+zy) vs Perp 2',H,xedges,yedges])
@@ -428,19 +418,16 @@ class p3d_dump(object):
             wx = (self.particles[species]['x']-delx/2.0)%delx
             wy = (self.particles[species]['y']-dely/2.0)%dely
 
-            print 'Getting partbx...'
             partbx = wx     *wy     *self.dump_field_dict['bx'][xind.tolist()    ,yind.tolist()] + \
                      (1.-wx)*wy     *self.dump_field_dict['bx'][(xind+1).tolist(),yind.tolist()] + \
                      wx     *(1.-wy)*self.dump_field_dict['bx'][xind.tolist()    ,(yind+1).tolist()] + \
                      (1.-wx)*(1.-wy)*self.dump_field_dict['bx'][(xind+1).tolist(),(yind+1).tolist()] 
 
-            print 'Getting partby...'
             partby = wx     *wy     *self.dump_field_dict['by'][xind.tolist()    ,yind.tolist()] + \
                      (1.-wx)*wy     *self.dump_field_dict['by'][(xind+1).tolist(),yind.tolist()] + \
                      wx     *(1.-wy)*self.dump_field_dict['by'][xind.tolist()    ,(yind+1).tolist()] + \
                      (1.-wx)*(1.-wy)*self.dump_field_dict['by'][(xind+1).tolist(),(yind+1).tolist()] 
 
-            print 'Getting partbz...'
             partbz = wx     *wy     *self.dump_field_dict['bz'][xind.tolist()    ,yind.tolist()] + \
                      (1.-wx)*wy     *self.dump_field_dict['bz'][(xind+1).tolist(),yind.tolist()] + \
                      wx     *(1.-wy)*self.dump_field_dict['bz'][xind.tolist()    ,(yind+1).tolist()] + \
@@ -468,7 +455,7 @@ class p3d_dump(object):
             bp22 = (partbz*bp11 - partbx*bp13)/np.sqrt(partbx**2+partby**2+partbz**2)
             bp23 = (partbx*bp12 - partby*bp11)/np.sqrt(partbx**2+partby**2+partbz**2)
             
-            self.pa = subpart
+            print 'Total %s in pitch angle range are: %i'%(species,len(subpart))
 
 ### This takes says that the B field is just the value at r0
 #c#        #qc#print 'Calculating B field'
@@ -510,10 +497,10 @@ class p3d_dump(object):
             veloperp2 = subpart['vx']*bp21+subpart['vy']*bp22+subpart['vz']*bp23
 
             return_hist_dict[species] = []
-            if kwargs.has_key('range'):
-                H, xedges, yedges = np.histogram2d(veloperp1,veloperp2,**kwargs)
-            else:
-                H, xedges, yedges = np.histogram2d(veloperp1,veloperp2)
+            #if kwargs.has_key('range'):
+            H, xedges, yedges = np.histogram2d(veloperp1,veloperp2,**kwargs)
+            #else:
+            #    H, xedges, yedges = np.histogram2d(veloperp1,veloperp2)
             H = np.rot90(H)
             H = np.flipud(H)
             return_hist_dict[species].append(H)
@@ -625,27 +612,18 @@ class p3d_dump(object):
             return_hist_dict[species] = []
 
         for species in velo.keys():
-            if kwargs.has_key('range'):
-                H, xedges, yedges = np.histogram2d(velo[species]['par'],velo[species]['perp1'],**kwargs)
-            else:
-                H, xedges, yedges = np.histogram2d(velo[species]['par'],velo[species]['perp1'])
+            H, xedges, yedges = np.histogram2d(velo[species]['par'],velo[species]['perp1'],**kwargs)
 # H needs to be rotated and flipped
             H = np.rot90(H)
             H = np.flipud(H)
             return_hist_dict[species].append(['Parallel vs Perp 1 (+zy)',H,xedges,yedges])
 
-            if kwargs.has_key('range'):
-                H, xedges, yedges = np.histogram2d(velo[species]['par'],velo[species]['perp2'],**kwargs)
-            else:
-                H, xedges, yedges = np.histogram2d(velo[species]['par'],velo[species]['perp2'])
+            H, xedges, yedges = np.histogram2d(velo[species]['par'],velo[species]['perp2'],**kwargs)
             H = np.rot90(H)
             H = np.flipud(H)
             return_hist_dict[species].append(['Parallel vs Perp 2',H,xedges,yedges])
 
-            if kwargs.has_key('range'):
-                H, xedges, yedges = np.histogram2d(velo[species]['perp1'],velo[species]['perp2'],**kwargs)
-            else:
-                H, xedges, yedges = np.histogram2d(velo[species]['perp1'],velo[species]['perp2'])
+            H, xedges, yedges = np.histogram2d(velo[species]['perp1'],velo[species]['perp2'],**kwargs)
             H = np.rot90(H)
             H = np.flipud(H)
             return_hist_dict[species].append(['Perp 1 (+zy) vs Perp 2',H,xedges,yedges])
@@ -807,10 +785,10 @@ class p3d_dump(object):
 
 # We need to looop over Ions and Electrons
             for species in self.species:
-                if species == 'i':
-                    print '\tSelecting Ions'
-                else:
-                    print '\tSelecting Electrons'
+                #if species == 'i':
+                #    print '\tSelecting Ions'
+                #else:
+                #    print '\tSelecting Electrons'
 # second for loop over the py
 # also just doing electron for right now
                 for yprocs_index in yprocs_2load:
