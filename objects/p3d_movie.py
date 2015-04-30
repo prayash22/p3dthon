@@ -25,7 +25,7 @@ from scipy.io.idl import readsav
 class p3d_movie(object):
     """p3d_run object """
 
-    def __init__(self, movie_path, param_dict, movie_num=-1): 
+    def __init__(self, movie_path, param_dict, movie_num=None): 
         """ Initilazition Routine for the p3d_run object
 
         Fill in method discription
@@ -50,7 +50,7 @@ class p3d_movie(object):
         self.movie_num = movie_num
         self.param_dict = param_dict
 
-        if movie_num < 0: movie_num = self._movie_num_options()
+        if movie_num is None: movie_num = self._movie_num_options()
 
         if movie_num/10 > 0:
             if movie_num/100 > 0:
@@ -172,7 +172,9 @@ class p3d_movie(object):
             byte_arr = np.frombuffer(fp[time],dtype=dat_type)
             # converting into a float
             self.debug_temp1 = byte_arr
-            byte_arr = 1.0*byte_arr.reshape(ney,nex).transpose()
+            #byte_arr = 1.0*byte_arr.reshape(ney,nex).transpose()
+# I am temporarlly removeing the transpose call so that it is more like the IDL restore stuff
+            byte_arr = 1.0*byte_arr.reshape(ney,nex)
 
             self.debug_temp2 = byte_arr
 # This seems to be working but we need to generalize for any file

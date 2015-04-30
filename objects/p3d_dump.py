@@ -358,7 +358,8 @@ class p3d_dump(object):
 
 
     def _vdist_pitch(self,**kwargs): 
-
+# I have a lot of code that can return a 2D distrubution function for a givn pitch angle range
+# but I don't think that this will ever be usefull... I should remove it
         if not kwargs.has_key('pa'): pa = 90. #pa = pitch_angle, but I am lazy
         else: pa = kwargs.pop('pa') 
         if not kwargs.has_key('dpa'): dpa = 5.
@@ -367,8 +368,12 @@ class p3d_dump(object):
         delx = self.param_dict['lx']*1.0/self.param_dict['pex']/self.param_dict['nx']
         dely = self.param_dict['ly']*1.0/(self.param_dict['pey']*self.param_dict['ny'])
 
+        if kwargs.has_key('energy'): energy = kwargs.pop('energy')
+        else: energy = False
+    
         velo={}
         return_hist_dict = {}
+        self.subpart = {}
         for species in self.species:
 
             xind = (np.floor((self.particles[species]['x']-delx/2.0)/delx)).astype(int)
@@ -395,40 +400,70 @@ class p3d_dump(object):
             vmag = np.sqrt(self.particles[species]['vx']**2+self.particles[species]['vy']**2+self.particles[species]['vz']**2)
             vpar = (self.particles[species]['vx']*partbx+self.particles[species]['vy']*partby+self.particles[species]['vz']*partbz)/np.sqrt(partbx**2+partby**2+partbz**2)
 
+# Not sure which of these two is right
             pitch_angle = np.arccos(vpar/vmag)/np.pi*180.
+            #pitch_angle = np.arctan(np.sqrt((vmag**2 - vpar**2)/2.)/vpar)/np.pi*180. + 90.
 
-            subpartind = np.where(abs(pitch_angle - pa) < dpa)
+            subpartind = np.where(abs(pitch_angle - pa) < dpa/2.)
 
 
             subpart = self.particles[species][subpartind]
-            pitch_angle = pitch_angle[subpartind] 
-            partbx = partbx[subpartind]
-            partby = partby[subpartind]
-            partbz = partbz[subpartind]
+            self.subpart[species] = subpart
+            subpitch_angle = pitch_angle[subpartind] 
 
-            bp11 = -1.0*partbz/np.sqrt(partbx**2 + partbz**2)
-            bp12 = 0.0*partby
-            bp13 = partbx/np.sqrt(partbx**2 + partbz**2)
-
-            bp21 = (partby*bp13 - partbz*bp12)/np.sqrt(partbx**2+partby**2+partbz**2)
-            bp22 = (partbz*bp11 - partbx*bp13)/np.sqrt(partbx**2+partby**2+partbz**2)
-            bp23 = (partbx*bp12 - partby*bp11)/np.sqrt(partbx**2+partby**2+partbz**2)
-            
             print 'Total %s in pitch angle range are: %i'%(species,len(subpart))
-
-            veloperp1 = subpart['vx']*bp11+subpart['vy']*bp12+subpart['vz']*bp13
-            veloperp2 = subpart['vx']*bp21+subpart['vy']*bp22+subpart['vz']*bp23
-
             return_hist_dict[species] = []
-            #if kwargs.has_key('range'):
-            H, xedges, yedges = np.histogram2d(veloperp1,veloperp2,**kwargs)
-            #else:
-            #    H, xedges, yedges = np.histogram2d(veloperp1,veloperp2)
-            H = np.rot90(H)
-            H = np.flipud(H)
-            return_hist_dict[species].append(H)
-            return_hist_dict[species].append(xedges)
-            return_hist_dict[species].append(yedges)
+
+#This is silly just do the whole distro right here
+            if energy:
+                if species == 'e':
+                    KE = self.param_dict['m_e']/2.0*(self.particles[species]['vx']**2+
+                                                     self.particles[species]['vy']**2+
+                                                     self.particles[species]['vz']**2)
+                else:
+                    KE = 1.0/2.0*(self.particles[species]['vx']**2+
+                                  self.particles[species]['vy']**2+
+                                  self.particles[species]['vz']**2)
+                #H,xedges = np.histogram(KE,**kwargs)
+                #return_hist_dict[species].append(H)
+                #return_hist_dict[species].append((xedges[:-1]+xedges[1:])/2.0)
+
+                self.KE = KE
+                self.pa = pitch_angle
+
+                H,xedges,yedges = np.histogram2d(KE,pitch_angle,**kwargs)
+                return_hist_dict[species].append(H)
+                return_hist_dict[species].append(xedges)
+                return_hist_dict[species].append(yedges)
+
+                
+            else:
+                partbx = partbx[subpartind]
+                partby = partby[subpartind]
+                partbz = partbz[subpartind]
+
+                bp11 = -1.0*partbz/np.sqrt(partbx**2 + partbz**2)
+                bp12 = 0.0*partby
+                bp13 = partbx/np.sqrt(partbx**2 + partbz**2)
+
+                bp21 = (partby*bp13 - partbz*bp12)/np.sqrt(partbx**2+partby**2+partbz**2)
+                bp22 = (partbz*bp11 - partbx*bp13)/np.sqrt(partbx**2+partby**2+partbz**2)
+                bp23 = (partbx*bp12 - partby*bp11)/np.sqrt(partbx**2+partby**2+partbz**2)
+                
+                print 'Total %s in pitch angle range are: %i'%(species,len(subpart))
+
+                veloperp1 = subpart['vx']*bp11+subpart['vy']*bp12+subpart['vz']*bp13
+                veloperp2 = subpart['vx']*bp21+subpart['vy']*bp22+subpart['vz']*bp23
+
+                #if kwargs.has_key('range'):
+                H, xedges, yedges = np.histogram2d(veloperp1,veloperp2,**kwargs)
+                #else:
+                #    H, xedges, yedges = np.histogram2d(veloperp1,veloperp2)
+                H = np.rot90(H)
+                H = np.flipud(H)
+                return_hist_dict[species].append(H)
+                return_hist_dict[species].append(xedges)
+                return_hist_dict[species].append(yedges)
 
 
         return return_hist_dict
@@ -439,10 +474,16 @@ class p3d_dump(object):
         right now the pitch version of this code dots every partical with its local B
         And this just dots them all with a constant B, which seems dumb, you should fix this!
         """
+        
         bx_interp = self.interp_field(self.dump_field_dict['bx'],self.param_dict['lx'],self.param_dict['ly'],self._r0)
         by_interp = self.interp_field(self.dump_field_dict['by'],self.param_dict['lx'],self.param_dict['ly'],self._r0)
         bz_interp = self.interp_field(self.dump_field_dict['bz'],self.param_dict['lx'],self.param_dict['ly'],self._r0)
         bmag_interp = (bx_interp**2+by_interp**2+bz_interp**2)**.5
+
+
+
+
+
 
         if by_interp > 0.:
             b_perp1x = 0.
@@ -479,9 +520,49 @@ class p3d_dump(object):
         for species in self.species:
             velo[species] = {}
 
-            velo[species]['par']   = (bx_interp*self.particles[species]['vx']+by_interp*self.particles[species]['vy']+bz_interp*self.particles[species]['vz'])/bmag_interp
-            velo[species]['perp1'] = self.particles[species]['vx']*b_perp1x+self.particles[species]['vy']*b_perp1y+self.particles[species]['vz']*b_perp1z
-            velo[species]['perp2'] = self.particles[species]['vx']*b_perp2x+self.particles[species]['vy']*b_perp2y+self.particles[species]['vz']*b_perp2z
+            delx = self.param_dict['lx']*1.0/self.param_dict['pex']/self.param_dict['nx']
+            dely = self.param_dict['ly']*1.0/(self.param_dict['pey']*self.param_dict['ny'])
+
+            xind = (np.floor((self.particles[species]['x']-delx/2.0)/delx)).astype(int)
+            yind = (np.floor((self.particles[species]['y']-dely/2.0)/dely)).astype(int)
+
+            wx = (self.particles[species]['x']-delx/2.0)%delx
+            wy = (self.particles[species]['y']-dely/2.0)%dely
+
+            partbx = wx     *wy     *self.dump_field_dict['bx'][xind.tolist()    ,yind.tolist()] + \
+                     (1.-wx)*wy     *self.dump_field_dict['bx'][(xind+1).tolist(),yind.tolist()] + \
+                     wx     *(1.-wy)*self.dump_field_dict['bx'][xind.tolist()    ,(yind+1).tolist()] + \
+                     (1.-wx)*(1.-wy)*self.dump_field_dict['bx'][(xind+1).tolist(),(yind+1).tolist()] 
+
+            partby = wx     *wy     *self.dump_field_dict['by'][xind.tolist()    ,yind.tolist()] + \
+                     (1.-wx)*wy     *self.dump_field_dict['by'][(xind+1).tolist(),yind.tolist()] + \
+                     wx     *(1.-wy)*self.dump_field_dict['by'][xind.tolist()    ,(yind+1).tolist()] + \
+                     (1.-wx)*(1.-wy)*self.dump_field_dict['by'][(xind+1).tolist(),(yind+1).tolist()] 
+
+            partbz = wx     *wy     *self.dump_field_dict['bz'][xind.tolist()    ,yind.tolist()] + \
+                     (1.-wx)*wy     *self.dump_field_dict['bz'][(xind+1).tolist(),yind.tolist()] + \
+                     wx     *(1.-wy)*self.dump_field_dict['bz'][xind.tolist()    ,(yind+1).tolist()] + \
+                     (1.-wx)*(1.-wy)*self.dump_field_dict['bz'][(xind+1).tolist(),(yind+1).tolist()] 
+
+            (partbx,partby,partbz) = (partbx/np.sqrt(partbx**2+partby**2+partbz**2),
+                                      partby/np.sqrt(partbx**2+partby**2+partbz**2),
+                                      partbz/np.sqrt(partbx**2+partby**2+partbz**2))
+
+            partpb1 =  0.0*partbx
+            partpb2 = -1.*np.sign(by_interp)*partbz/(partbz**2 + partby**2)**(.5)
+            partpb3 = 1.*np.sign(by_interp)*partby/(partbx**2 + partby**2)**(.5)
+
+            (partpb1,partpb2,partpb3) = (partpb1/np.sqrt(partpb1**2+partpb2**2+partpb3**2),
+                                         partpb2/np.sqrt(partpb1**2+partpb2**2+partpb3**2),
+                                         partpb3/np.sqrt(partpb1**2+partpb2**2+partpb3**2))
+
+            partpp1 =  (partby*partpb3 - partbz*partpb2)
+            partpp2 =  (partbz*partpb1 - partbx*partpb3)
+            partpp3 =  (partbx*partpb2 - partby*partpb1)
+
+            velo[species]['par']   = (partbx*self.particles[species]['vx']+partby*self.particles[species]['vy']+partbz*self.particles[species]['vz'])
+            velo[species]['perp1'] = (partpb1*self.particles[species]['vx']+partpb2*self.particles[species]['vy']+partpb3*self.particles[species]['vz'])
+            velo[species]['perp2'] = (partpp1*self.particles[species]['vx']+partpp2*self.particles[species]['vy']+partpp3*self.particles[species]['vz'])
 
 
         #velo['e']['par']   = (bx_interp*self.particles['e']['vx']+by_interp*self.particles['e']['vy']+bz_interp*self.particles['e']['vz'])/bmag_interp

@@ -281,7 +281,7 @@ class p3d_run(object):
         else: return self.use_file
         
 
-    def _test_info_key(self,key,info_discription='',path_flag=False,value=None):
+    def _test_info_key(self,key,info_discription=None,path_flag=False,value=None):
         """ A Method that checks to seff a this peice of info is in the run.info file
             If the peice of info is not contained it addes its to the set
         """
@@ -291,20 +291,21 @@ class p3d_run(object):
                 if path_flag: self._add_info_keyval(key,os.path.abspath(value))
                 else: self._add_info_keyval(key,value)
             else:
-                print '### WARNING: Key %s not found in run.info file!' % key
-
-                print "    Would you like to add %s to run.infofile (y/''))?" % key,
-                get_raw = raw_input()
-                if get_raw.lower() != 'y':
-                    print 'OK, no info added to run.info file! ABORTING METHOD CALL!!'
-                    return -1
+                print '### WARNING:  %s not found!' % key
+                # This is dumb whay ask if they want to add the thing they need?
+                #print "    Would you like to add %s to run.infofile (y/''))?" % key,
+                #get_raw = raw_input()
+                #if get_raw.lower() != 'y':
+                #    print 'OK, no info added to run.info file! ABORTING METHOD CALL!!'
+                #    return -1
+                #else:
+                if len(info_discription) is not None:
+                    print "Please enter %s: " % (info_discription)
                 else:
-                    print "What value do you want to add for the key %s? " % (key)
-                    if len(info_discription) >0:
-                        print 'Info Discription: %s' % (info_discription)
-                    get_raw = raw_input()
-                    if path_flag: self._add_info_keyval(key,os.path.abspath(get_raw))
-                    else: self._add_info_keyval(key,get_raw)
+                    print 'please enter %s: ' % (key)
+                get_raw = raw_input()
+                if path_flag: self._add_info_keyval(key,os.path.abspath(get_raw))
+                else: self._add_info_keyval(key,get_raw)
                 
     def change_info_val(self,key,info_discription='',path_flag=False):
         """ A Method that allows you to change a value coresponding to a particular key in the run.info file
@@ -335,7 +336,7 @@ class p3d_run(object):
         """
 # load_param requires a path for the param file! a run_info_dict entry of 'param_path'
         if self._test_info_key('param_path',\
-            'Full path of param file for this run, included the files name',\
+            'the param file',\
             path_flag=True,value=param) == -1:
 
             print 'Necesarry Path for the Param File not Set!!! ABORTING!!!'
@@ -364,7 +365,7 @@ class p3d_run(object):
                     val = 'NO_ARG'
                 self.param_dict[key] = val
 
-    def load_movie(self,var='NOT_SET',time=-1,change_movie=False): #Colby add this, if there is any update to the p3d run reload the movie
+    def load_movie(self,var='NOT_SET',time=-1,movie_num=None): #Colby add this, if there is any update to the p3d run reload the movie
         """ Outer class wrapper for the inner class method load_movie
 
         Load movie files for a given set of varibles.
@@ -378,13 +379,13 @@ class p3d_run(object):
         :
         2014-08-07
         """
-        if (not hasattr(self,'movie') or change_movie == True):
-            self._reff_movie()
+        if (not hasattr(self,'movie') or (movie_num is not None)):
+            self._reff_movie(movie_num)
         return self.movie.load_movie(var,time)
 
 
 
-    def _reff_movie(self,movie_num=-1):
+    def _reff_movie(self,movie_num=None):
         import p3d_movie
 # load_param requires a path for the param file! a run_info_dict entry of 'param_path'
 
@@ -434,7 +435,6 @@ class p3d_run(object):
 #
 #CoOLBY!!! make sure you pad movie num
 
-################################################################# foobar you stoped here
         if self.run_info_dict['run_name'] == 'local': value = './'
         else: value = None
         if self._test_info_key('dump_path','Full path of dump files for this run',path_flag=True,value=value) == -1:

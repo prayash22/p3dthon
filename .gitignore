@@ -53,3 +53,5 @@ coverage.xml
 docs/_build/
 
 # Run info files
+# Folder for files that should not be in these folder, but I have not deleted or moved
+trash/
