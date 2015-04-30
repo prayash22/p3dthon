@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.io.idl import readsav
+from matplotlib.ticker import AutoMinorLocator
 
 def set_local(IDL_restore,lcl):
     #lcl = locals()
@@ -47,24 +48,44 @@ def TestTen(var,lcl,av=''):
     else: 
         return False
 
+#======================================================
+#======================================================
+
 def ims(fdic,key,ax=None,ordflg='idl',**kwargs):
     """
     A wrapper function for imshow to do most tedious stuff for my simulations
     """
-    if ax is  None:
-        ax = plt.gca()
+    if ax is None: ax = plt.gca()
 
-    if ordflg == 'idl':
-        plt_val = fdic[key]
-    else:
-        plt_val = fdic[key].T
+    if ordflg == 'idl': plt_val = fdic[key]
+        
+    else: plt_val = fdic[key].T
+# Use the dict values of xx and yy to set extent
+    extent = [fdic['xx'][0],
+              fdic['xx'][-1],
+              fdic['yy'][0],
+              fdic['yy'][-1]]
 
-    if not kwargs.has_key('cmap'):
-        return_ims = ax.imshow(plt_val,origin='low',extent=[fdic['xx'][0],fdic['xx'][-1],fdic['yy'][0],fdic['yy'][-1]],cmap='PuOr',**kwargs)
-    else:
-        return_ims = ax.imshow(plt_val,origin='low',extent=[fdic['xx'][0],fdic['xx'][-1],fdic['yy'][0],fdic['yy'][-1]],**kwargs)
+    if kwargs.has_key('cmap'): cmap=kwargs.pop('cmap')
+    else:                      cmap='PuOr'
+
+    return_ims = ax.imshow(plt_val,
+                           origin='low',
+                           extent=extent,
+                           cmap=cmap,            # I just love this color map
+                           **kwargs)
+
+    # Giveing the plot minor tick marks
+    minorLocator = AutoMinorLocator()
+    ax.yaxis.set_minor_locator(minorLocator)
+    minorLocator = AutoMinorLocator()           # Note the second call is so that the minor x ticks are not
+    ax.xaxis.set_minor_locator(minorLocator)    # the same as the y ticks
+
     plt.draw()
     return return_ims
+
+#======================================================
+#======================================================
 
 def var_at(fdic,key,r0,ordflg='idl'):
     delx = fdic['xx'][1] - fdic['xx'][0] 
