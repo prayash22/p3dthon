@@ -47,12 +47,11 @@ def TestTen(var,lcl,av=''):
     else: 
         return False
 
-###
-### A wrapper function for imshow to do most tedious stuff for my simulations
-###
-def ims(fdic,key,ax='not_set',ordflg='idl',**kwargs):
-
-    if ax == 'not_set':
+def ims(fdic,key,ax=None,ordflg='idl',**kwargs):
+    """
+    A wrapper function for imshow to do most tedious stuff for my simulations
+    """
+    if ax is  None:
         ax = plt.gca()
 
     if ordflg == 'idl':
@@ -66,6 +65,29 @@ def ims(fdic,key,ax='not_set',ordflg='idl',**kwargs):
         return_ims = ax.imshow(plt_val,origin='low',extent=[fdic['xx'][0],fdic['xx'][-1],fdic['yy'][0],fdic['yy'][-1]],**kwargs)
     plt.draw()
     return return_ims
+
+def var_at(fdic,key,r0,ordflg='idl'):
+    delx = fdic['xx'][1] - fdic['xx'][0] 
+    dely = fdic['yy'][1] - fdic['yy'][0] 
+
+    xind = (np.floor((r0[0]-delx/2.0)/delx)).astype(int)
+    yind = (np.floor((r0[1] - fdic['yy'][0])/dely)).astype(int)
+
+    wx = (r0[0]-delx/2.0)%delx
+    wy = (r0[1]-fdic['yy'][0])%dely
+
+    if ordflg =='idl':
+        var = wx     *wy     *fdic[key][yind    ,xind    ] + \
+              (1.-wx)*wy     *fdic[key][yind    ,(xind+1)] + \
+              wx     *(1.-wy)*fdic[key][(yind+1),xind    ] + \
+              (1.-wx)*(1.-wy)*fdic[key][(yind+1),(xind+1)] 
+    else:
+        var = wx     *wy     *fdic[key][xind    ,yind] + \
+              (1.-wx)*wy     *fdic[key][(xind+1),yind] + \
+              wx     *(1.-wy)*fdic[key][xind    ,(yind+1)] + \
+              (1.-wx)*(1.-wy)*fdic[key][(xind+1),(yind+1)] 
+
+    return var
 
 
 def read_movie(**kwargs):

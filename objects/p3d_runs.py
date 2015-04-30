@@ -362,7 +362,7 @@ class p3d_run(object):
                     val = 'NO_ARG'
                 self.param_dict[key] = val
 
-    def load_movie(self,var='NOT_SET',time=-1,change_movie=False): #Colby add this, if there is any update to the p3d run reload the movie
+    def load_movie(self,var='NOT_SET',time=-1,movie_num=None): #Colby add this, if there is any update to the p3d run reload the movie
         """ Outer class wrapper for the inner class method load_movie
 
         Load movie files for a given set of varibles.
@@ -376,13 +376,13 @@ class p3d_run(object):
         :
         2014-08-07
         """
-        if (not hasattr(self,'movie') or change_movie == True):
-            self._reff_movie()
+        if (not hasattr(self,'movie') or (movie_num is not None)):
+            self._reff_movie(movie_num)
         return self.movie.load_movie(var,time)
 
 
 
-    def _reff_movie(self,movie_num=-1):
+    def _reff_movie(self,movie_num=None):
         import p3d_movie
 # load_param requires a path for the param file! a run_info_dict entry of 'param_path'
 

@@ -50,7 +50,7 @@ class TPRun:
         @param v0          : initial velocity
         @param dv0         : initial velocity deviation
         @param dt          : time step
-        @param loading     : either 'randu', 'randn', or 'copy'
+        @param loading     : either 'randu', 'randu_mag', 'randn', or 'copy'
         @param fieldinterp : delfault(False) inteprolate fields in time or not
 
         if loading == 'randu' particles will be loaded randomly in a rectangle
@@ -109,6 +109,9 @@ class TPRun:
         self._loading = loading
         if loading.lower() == 'randu':
             self.load_randu(r0,dr0,v0,dv0)
+
+        elif loading.lower() == 'randu_mag':
+            self.load_randu_mag(r0,dr0,v0,dv0)
 
         #c# elif loading.lower() == 'randn':
         #c#     self.load_randn(r0,dr0,v0,dv0)
@@ -175,7 +178,7 @@ class TPRun:
             # smooth fields may help... B is fine, E is noisy !!
             for c in range(3):
                 self._E[c,:,:] = ndimage.gaussian_filter(self._E[c,:,:],
-                                                         sigma=6,
+                                                         sigma=2, #used to be 6
                                                          order=0)
 
             # checks which component is the out of plane
@@ -382,6 +385,31 @@ class TPRun:
 
     #==========================================================
     #==========================================================
+    def _velinit_mag(self, v, dv):
+        """uniform random velocity magnetudies but constant unit vector
+
+        Creation : 2015-04-28 17:12:42.773824
+
+        """
+
+        # create the array
+        self._v0 = np.zeros((3, self._npart))
+
+        # x, y, z components of the velocity
+        c = 0
+
+        # loop over vx0, vy0, vz0
+        vmag = 0.0
+        for v_i in v:
+            vmag = vmag+v_i**2
+        vmag = sqrt(vmag)
+        rmag = np.random.random(self._npart)
+        for v_i in v:
+            self._v0[c,:] = dv*rmag*v_i/vmag 
+            c += 1
+
+    #==========================================================
+    #==========================================================
     def load_randu(self,
                    r,
                    dr,
@@ -430,6 +458,56 @@ class TPRun:
 
     #==========================================================
 
+    #==========================================================
+    #==========================================================
+    def load_randu_mag(self,
+                      r,
+                      dr,
+                      v,
+                      dv):
+
+        """ loads particles randomly in a rectangle
+
+        The method loads the particles in a rectangle
+        of side 'dr' entered around 'r'.
+        Particles are loaded uniformly in that rectangle.
+        Velocities are uniformly distributed within 'dv' from 'v'
+        However dv is now broken into two parts, dv|| and dv perp
+
+        Carefull : this method will erase any initial position
+        and velocity that may have already been initialized.
+
+        @param r    : (x,y,z) center of the rectangle
+        @param dr   : (dx,dy,dz) size of the rectangle
+        @param v    : (Vx,Vy,Vz) mean initial velocity
+        @param dv   : (dV||,dVperp) initial velocity interval
+
+        @return: @todo
+
+        Exemple  :
+
+        Creation : 2013-05-01 11:21:19.671182
+
+        """
+        print 'Loading particles in a spatially uniform random distribution...'
+
+        self._r0  = np.zeros((3, self._npart))
+
+        c = 0. # x, y and z components
+
+        for r_i, dr_i in zip(r, dr):
+
+            r1            = r_i - dr_i/2.
+            r2            = r_i + dr_i/2.
+            self._r0[c,:] = np.random.random(self._npart)
+
+            self._r0[c,:]  = self._r0[c,:]* (r2 - r1) + r1
+
+            c += 1
+
+        self._velinit_mag(v,dv)
+
+    #==========================================================
 
 
 
