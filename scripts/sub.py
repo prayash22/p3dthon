@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.io.idl import readsav
 from matplotlib.ticker import AutoMinorLocator
+from p3d_runs import p3d_run
 
 def set_local(IDL_restore,lcl):
     #lcl = locals()
@@ -49,7 +50,6 @@ def TestTen(var,lcl,av=''):
         return False
 
 #======================================================
-#======================================================
 
 def ims(fdic,key,ax=None,ordflg='idl',**kwargs):
     """
@@ -85,7 +85,6 @@ def ims(fdic,key,ax=None,ordflg='idl',**kwargs):
     return return_ims
 
 #======================================================
-#======================================================
 
 def var_at(fdic,key,r0,ordflg='idl'):
     delx = fdic['xx'][1] - fdic['xx'][0] 
@@ -111,7 +110,8 @@ def var_at(fdic,key,r0,ordflg='idl'):
     return var
 
 
-def read_movie(**kwargs):
+def load_movie(**kwargs):
     print 'not coded yet...'
+    return p3d_run('local').load_movie('all')
 
 
