@@ -612,17 +612,17 @@ class p3d_dump(object):
 # H needs to be rotated and flipped
             H = np.rot90(H)
             H = np.flipud(H)
-            return_hist_dict[species].append(['V_X vs V_Y',H,(xedges[1:]+xedges[:-1])/2.,(yedges[1:]+yedges[:-1])/2.])
+            return_hist_dict[species].append(['V_X vs V_Y',H,xedges,yedges])
 
             H, xedges, yedges = np.histogram2d(self.particles[species]['vx'],self.particles[species]['vz'],**kwargs)
             H = np.rot90(H)
             H = np.flipud(H)
-            return_hist_dict[species].append(['V_X vs V_Z',H,(xedges[1:]+xedges[:-1])/2.,(yedges[1:]+yedges[:-1])/2.])
+            return_hist_dict[species].append(['V_X vs V_Z',H,xedges,yedges])
 
             H, xedges, yedges = np.histogram2d(self.particles[species]['vy'],self.particles[species]['vz'],**kwargs)
             H = np.rot90(H)
             H = np.flipud(H)
-            return_hist_dict[species].append(['V_Y vs V_Z',H,(xedges[1:]+xedges[:-1])/2.,(yedges[1:]+yedges[:-1])/2.])
+            return_hist_dict[species].append(['V_Y vs V_Z',H,xedges,yedges])
 
 # Mask zeros
          #Hmasked = np.ma.masked_where(H==0,H)
@@ -648,11 +648,12 @@ class p3d_dump(object):
         """
         x0 = r0[0]
         y0 = r0[1]
-        if isinstance(dx,list):
+        if isinstance(dx,float) or isinstance(dx,float):
+            dx = dx*1.0
+            dy = dx       # Square box is assumed
+        else:
             dy = dx[1]
             dx = dx[0]
-        else: 
-            dy = dx       # Square box is assumed
 
         #qc#print 'r0 = [%f,%f] and dx = [%f,%f]'%(x0,y0,dx,dy)
 # Figure out which set of processors we are on
