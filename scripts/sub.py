@@ -114,4 +114,17 @@ def load_movie(**kwargs):
     print 'not coded yet...'
     return p3d_run('local').load_movie('all')
 
+def show_energy(fname=None):
+    if fname is None:
+        fname = raw_input('Enter p3d.stdout file: ')
+
+    f = open(fname, 'r')
+    eng = []
+    for lines in f:
+        if lines.find('ENERGY') > -1 and lines.find('ENERGY:') < 0:
+            eng.append(lines.split()[1:4])
+    f.close()
+
+    return np.array(eng)
+
 
