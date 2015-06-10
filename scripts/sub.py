@@ -50,6 +50,26 @@ def TestTen(var,lcl,av=''):
         return False
 
 #======================================================
+def rotate_ten(IDL_restore,var='pi'):
+    bmag = sqrt( CR['bxav']**2+
+                 CR['byav']**2+
+                 CR['bzav']**2)
+    bbx = CR['bxav']/bmag
+    bby = CR['byav']/bmag
+    bbz = CR['bzav']/bmag
+
+    if var+'parav' in IDL_restore.keys():
+        print 'Warning: %sparav was found in the restored data: nothing will be rotated!!!!'
+        pass
+    else:
+        CR[var+'parav'] = (bbx*(bbx*CR[var+'xxav'] + bby*CR[var+'xyav'] + bbz*CR[var+'xzav']) +
+                           bby*(bbx*CR[var+'xyav'] + bby*CR[var+'yyav'] + bbz*CR[var+'yzav']) +
+                           bbz*(bbx*CR[var+'xzav'] + bby*CR[var+'yzav'] + bbz*CR[var+'zzav']))
+
+        CR[var+'perp1av'] = (CR[var+'xxav'] + CR[var+'yyav'] +CR[var+'zzav'] - CR[var+'parav'])/2.
+        CR[var+'perp2av'] = CR[var+'perp1av']
+
+#======================================================
 
 def ims(fdic,key,ax=None,ordflg='idl',**kwargs):
     """
@@ -126,5 +146,4 @@ def show_energy(fname=None):
     f.close()
 
     return np.array(eng)
-
 

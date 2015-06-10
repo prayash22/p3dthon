@@ -234,6 +234,15 @@ class p3d_movie(object):
                               'pexx','peyy','pezz','pexy','peyz','pexz',
                               'ni',
                               'pixx','piyy','pizz','pixy','piyz','pixz']
+        elif self.param_dict['movie_header'] == '"movie4b.h"':
+            self.movie_arr = ['rho',
+                              'jx','jy','jz',
+                              'bx','by','bz',
+                              'ex','ey','ez',
+                              'ne','jex','jey','jez',
+                              'pexx','peyy','pezz','pexz','peyz','pexy',
+                              'ni','jix','jiy','jiz',
+                              'pixx','piyy','pizz' 'pixz','piyz','pixy']
         elif self.param_dict['movie_header'] == '"movie2dD.h"':
             self.movie_arr = ['rho',
                               'jx','jy','jz',
