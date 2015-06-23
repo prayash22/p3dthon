@@ -386,7 +386,11 @@ class p3d_dump(object):
                                   self.interp_field(self.dump_field_dict['ez'],self.param_dict['lx'],self.param_dict['ly'],self._r0)])
 
             exb = np.cross(e_interp,b_interp)/sum(b_interp**2)
-            exb = exb/np.sqrt(sum(exb**2))
+            if abs(np.sqrt(sum(exb**2))) < np.spacing(10):
+                exb = np.cross(np.array([0.,1.,1.]),b_interp)
+                exb = exb/np.sqrt(sum(exb**2))
+            else:
+                exb = exb/np.sqrt(sum(exb**2))
 
             b_interp = b_interp/np.sqrt(sum(b_interp**2))
 
@@ -446,6 +450,10 @@ class p3d_dump(object):
                 print 'vdist_2d is crashing!!!!'
                 print ''
             
+            self.vax = vax
+            self.vp = np.sqrt(vp0**2+vp1**2)
+            self.exb = exb
+            self.bxexb = bxexb
             # This means field aligned is 0, perp is 90 and anti aligned is 180
             pitch_angle = -1.0*(np.arctan(vax/np.sqrt(vp0**2+vp1**2))/np.pi*180. - 90.)
             self.ptc = pitch_angle
@@ -491,7 +499,7 @@ class p3d_dump(object):
                 xx,yy = np.meshgrid(yedges,xedges)
                 eng = (xx[1:,1:]+xx[:-1,:-1])/2.
                 ynorm = (np.cos(yy[:-1,:-1]/180.*np.pi) - np.cos(yy[1:,1:]/180.*np.pi))
-                ynorm = ynorm/ynorm.min()
+                ynorm = ynorm/sum(ynorm)
                 if species == 'e':
                     self.ynorm=ynorm
                     self.pa = pitch_angle
@@ -782,23 +790,71 @@ class p3d_dump(object):
         return_hist_dict = {}
         return_hist_dict['i'] = []
         return_hist_dict['e'] = []
-      
-        for species in self.species:
-            H, xedges, yedges = np.histogram2d(self.particles[species]['vx'],self.particles[species]['vy'],**kwargs)
+        if kwargs.has_key('gen_vec'):
+            gvec = kwargs.pop('gen_vec')
+            vec1 = np.array(gvec[0])
+            vec2 = np.array(gvec[1])
+            vec1 = vec1/np.sqrt(np.sum(vec1**2))
+            vec2 = vec2/np.sqrt(np.sum(vec2**2))
+            if abs(np.dot(vec1,vec2)) > 10e-4:
+                print ''
+                print 'The two vectors given are not orthognal!!!!'
+                print 'The exception for handeling this has not been coded'
+                print 'kindly fix your shit and try again ~Colby'
+                print ''
+                return -1
+            else:
+                vec3 = np.cross(vec1,vec2)
+
+            velo = {}
+            for species in self.species:
+
+                velo[species] = {}
+
+                velo[species]['v1']   = (vec1[0]*self.particles[species]['vx']+
+                                         vec1[1]*self.particles[species]['vy']+
+                                         vec1[2]*self.particles[species]['vz'])
+
+                velo[species]['v2'] = (vec2[0]*self.particles[species]['vx']+
+                                       vec2[1]*self.particles[species]['vy']+
+                                       vec2[2]*self.particles[species]['vz'])
+
+                velo[species]['v3'] = (vec3[0]*self.particles[species]['vx']+
+                                       vec3[1]*self.particles[species]['vy']+
+                                       vec3[2]*self.particles[species]['vz'])
+
+                H, xedges, yedges = np.histogram2d(velo[species]['v1'],velo[species]['v2'],**kwargs)
 # H needs to be rotated and flipped
-            H = np.rot90(H)
-            H = np.flipud(H)
-            return_hist_dict[species].append(['V_X vs V_Y',H,xedges,yedges])
+                H = np.rot90(H)
+                H = np.flipud(H)
+                return_hist_dict[species].append(['V_1 vs V_2',H,xedges,yedges])
 
-            H, xedges, yedges = np.histogram2d(self.particles[species]['vx'],self.particles[species]['vz'],**kwargs)
-            H = np.rot90(H)
-            H = np.flipud(H)
-            return_hist_dict[species].append(['V_X vs V_Z',H,xedges,yedges])
+                H, xedges, yedges = np.histogram2d(velo[species]['v1'],velo[species]['v3'],**kwargs)
+                H = np.rot90(H)
+                H = np.flipud(H)
+                return_hist_dict[species].append(['V_1 vs V_3',H,xedges,yedges])
 
-            H, xedges, yedges = np.histogram2d(self.particles[species]['vy'],self.particles[species]['vz'],**kwargs)
-            H = np.rot90(H)
-            H = np.flipud(H)
-            return_hist_dict[species].append(['V_Y vs V_Z',H,xedges,yedges])
+                H, xedges, yedges = np.histogram2d(velo[species]['v2'],velo[species]['v3'],**kwargs)
+                H = np.rot90(H)
+                H = np.flipud(H)
+                return_hist_dict[species].append(['V_2 vs V_3',H,xedges,yedges])
+        else:
+            for species in self.species:
+                H, xedges, yedges = np.histogram2d(self.particles[species]['vx'],self.particles[species]['vy'],**kwargs)
+# H needs to be rotated and flipped
+                H = np.rot90(H)
+                H = np.flipud(H)
+                return_hist_dict[species].append(['V_X vs V_Y',H,xedges,yedges])
+
+                H, xedges, yedges = np.histogram2d(self.particles[species]['vx'],self.particles[species]['vz'],**kwargs)
+                H = np.rot90(H)
+                H = np.flipud(H)
+                return_hist_dict[species].append(['V_X vs V_Z',H,xedges,yedges])
+
+                H, xedges, yedges = np.histogram2d(self.particles[species]['vy'],self.particles[species]['vz'],**kwargs)
+                H = np.rot90(H)
+                H = np.flipud(H)
+                return_hist_dict[species].append(['V_Y vs V_Z',H,xedges,yedges])
 
 # Mask zeros
          #Hmasked = np.ma.masked_where(H==0,H)
