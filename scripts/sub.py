@@ -50,6 +50,26 @@ def TestTen(var,lcl,av=''):
         return False
 
 #======================================================
+def rotate_ten(IDL_restore,var='pi'):
+    bmag = sqrt( CR['bxav']**2+
+                 CR['byav']**2+
+                 CR['bzav']**2)
+    bbx = CR['bxav']/bmag
+    bby = CR['byav']/bmag
+    bbz = CR['bzav']/bmag
+
+    if var+'parav' in IDL_restore.keys():
+        print 'Warning: %sparav was found in the restored data: nothing will be rotated!!!!'
+        pass
+    else:
+        CR[var+'parav'] = (bbx*(bbx*CR[var+'xxav'] + bby*CR[var+'xyav'] + bbz*CR[var+'xzav']) +
+                           bby*(bbx*CR[var+'xyav'] + bby*CR[var+'yyav'] + bbz*CR[var+'yzav']) +
+                           bbz*(bbx*CR[var+'xzav'] + bby*CR[var+'yzav'] + bbz*CR[var+'zzav']))
+
+        CR[var+'perp1av'] = (CR[var+'xxav'] + CR[var+'yyav'] +CR[var+'zzav'] - CR[var+'parav'])/2.
+        CR[var+'perp2av'] = CR[var+'perp1av']
+
+#======================================================
 
 def ims(fdic,key,ax=None,ordflg='idl',**kwargs):
     """
@@ -114,4 +134,16 @@ def load_movie(**kwargs):
     print 'not coded yet...'
     return p3d_run('local').load_movie('all')
 
+def show_energy(fname=None):
+    if fname is None:
+        fname = raw_input('Enter p3d.stdout file: ')
+
+    f = open(fname, 'r')
+    eng = []
+    for lines in f:
+        if lines.find('ENERGY') > -1 and lines.find('ENERGY:') < 0:
+            eng.append(lines.split()[1:4])
+    f.close()
+
+    return np.array(eng)
 

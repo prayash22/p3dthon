@@ -240,7 +240,7 @@ class p3d_dump(object):
         movie_num_int = raw_input()
         return int(movie_num_int)
 
-    def vdist_2d(self,r0=[0.5,0.5],dx=[1.0,1.0],par=False,Bvec=False,pitch=False,OneD=False,**kwargs):
+    def vdist_2d(self,r0=[0.5,0.5],dx=[1.0,1.0],par=False,Bvec=False,pitch=False,pizza=False,OneD=False,**kwargs):
         """Generates differnent 2-Dimensional histograms for particles 
         """
 # Turn this into a method
@@ -276,12 +276,14 @@ class p3d_dump(object):
 #
 # Right now im only coding the faster one
         if not kwargs.has_key('bins'): kwargs['bins']=51
-        if par or Bvec or pitch:
+        if par or Bvec or pitch or pizza:
             #qc#print 'Reading in the Fields form the Dump File'
             self.dump_field_dict = self.read_dump_file(fields=True)
             if pitch:
-                return_hist = self._vdist_pitch(**kwargs)
-            elif par:
+                return_hist = self._vdist_pitch(par,**kwargs)
+            elif pizza:
+                return_hist = self._vdist_pizza(par,**kwargs)
+            elif par and not pitch and not pizza:
                 return_hist = self._vdist_2d_par(**kwargs)
             else:
                 return_hist = self._vdist_2d(**kwargs)
@@ -357,61 +359,116 @@ class p3d_dump(object):
 #wut?        return return_hist_dict
 
 
-    def _vdist_pitch(self,**kwargs): 
+    def _vdist_pitch(self,par=False,**kwargs): 
 # I have a lot of code that can return a 2D distrubution function for a givn pitch angle range
 # but I don't think that this will ever be usefull... I should remove it
         if not kwargs.has_key('pa'): pa = 90. #pa = pitch_angle, but I am lazy
         else: pa = kwargs.pop('pa') 
         if not kwargs.has_key('dpa'): dpa = 5.
         else: dpa = kwargs.pop('dpa') 
-        
-        delx = self.param_dict['lx']*1.0/self.param_dict['pex']/self.param_dict['nx']
-        dely = self.param_dict['ly']*1.0/(self.param_dict['pey']*self.param_dict['ny'])
 
         if kwargs.has_key('energy'): energy = kwargs.pop('energy')
         else: energy = False
-    
+        if not kwargs.has_key('pa'): pa = 90. #pa = pitch_angle, but I am lazy
+        else: pa = kwargs.pop('pa') 
+        if not kwargs.has_key('wax'): wax = 0 #pa = which_axsis, but I am lazy
+        else: wax = kwargs.pop('wax') 
+        if energy: par = True; kwargs['normed'] = True
+##############################################
+
+        if par:
+            b_interp = np.array([ self.interp_field(self.dump_field_dict['bx'],self.param_dict['lx'],self.param_dict['ly'],self._r0),
+                                  self.interp_field(self.dump_field_dict['by'],self.param_dict['lx'],self.param_dict['ly'],self._r0),
+                                  self.interp_field(self.dump_field_dict['bz'],self.param_dict['lx'],self.param_dict['ly'],self._r0)])
+
+            e_interp = np.array([ self.interp_field(self.dump_field_dict['ex'],self.param_dict['lx'],self.param_dict['ly'],self._r0),
+                                  self.interp_field(self.dump_field_dict['ey'],self.param_dict['lx'],self.param_dict['ly'],self._r0),
+                                  self.interp_field(self.dump_field_dict['ez'],self.param_dict['lx'],self.param_dict['ly'],self._r0)])
+
+            exb = np.cross(e_interp,b_interp)/sum(b_interp**2)
+            if abs(np.sqrt(sum(exb**2))) < np.spacing(10):
+                exb = np.cross(np.array([0.,1.,1.]),b_interp)
+                exb = exb/np.sqrt(sum(exb**2))
+            else:
+                exb = exb/np.sqrt(sum(exb**2))
+
+            b_interp = b_interp/np.sqrt(sum(b_interp**2))
+
+            bxexb = np.cross(b_interp,exb) 
+            print b_interp
+            print exb
+            print bxexb
+
         velo={}
         return_hist_dict = {}
         self.subpart = {}
+        #print 'Mucking this up!!'
+        #Npart = np.shape(self.particles['e']['vx'])
+        #self.particles['e']['vx'] = 1.*np.random.normal(scale=2.5,size=Npart)
+        #self.particles['e']['vy'] = 1.*np.random.normal(scale=2.5,size=Npart)
+        #self.particles['e']['vz'] = 1.*np.random.normal(scale=2.5,size=Npart)
+        ##print 'Done Mucking this up!!!'
         for species in self.species:
+       
+            if par:
+                v0 = (b_interp[0]*self.particles[species]['vx']+
+                      b_interp[1]*self.particles[species]['vy']+
+                      b_interp[2]*self.particles[species]['vz'])
 
-            xind = (np.floor((self.particles[species]['x']-delx/2.0)/delx)).astype(int)
-            yind = (np.floor((self.particles[species]['y']-dely/2.0)/dely)).astype(int)
+                v1 = (exb[0]*self.particles[species]['vx']+
+                      exb[1]*self.particles[species]['vy']+
+                      exb[2]*self.particles[species]['vz'])
 
-            wx = (self.particles[species]['x']-delx/2.0)%delx
-            wy = (self.particles[species]['y']-dely/2.0)%dely
+                v2 = (bxexb[0]*self.particles[species]['vx']+
+                      bxexb[1]*self.particles[species]['vy']+
+                      bxexb[2]*self.particles[species]['vz'])
+                #print 'Mucking this up!!!'
+                #Npart = 100000
+                #v0 = 1.*np.random.normal(scale=3.0,size=Npart)
+                #v1 = 1.*np.random.normal(scale=1.0,size=Npart)
+                #v2 = 1.*np.random.normal(scale=1.0,size=Npart)
+            else:
+                v0 = self.particles[species]['vx']
+                v1 = self.particles[species]['vy']
+                v2 = self.particles[species]['vz']
 
-            partbx = wx     *wy     *self.dump_field_dict['bx'][xind.tolist()    ,yind.tolist()] + \
-                     (1.-wx)*wy     *self.dump_field_dict['bx'][(xind+1).tolist(),yind.tolist()] + \
-                     wx     *(1.-wy)*self.dump_field_dict['bx'][xind.tolist()    ,(yind+1).tolist()] + \
-                     (1.-wx)*(1.-wy)*self.dump_field_dict['bx'][(xind+1).tolist(),(yind+1).tolist()] 
-
-            partby = wx     *wy     *self.dump_field_dict['by'][xind.tolist()    ,yind.tolist()] + \
-                     (1.-wx)*wy     *self.dump_field_dict['by'][(xind+1).tolist(),yind.tolist()] + \
-                     wx     *(1.-wy)*self.dump_field_dict['by'][xind.tolist()    ,(yind+1).tolist()] + \
-                     (1.-wx)*(1.-wy)*self.dump_field_dict['by'][(xind+1).tolist(),(yind+1).tolist()] 
-
-            partbz = wx     *wy     *self.dump_field_dict['bz'][xind.tolist()    ,yind.tolist()] + \
-                     (1.-wx)*wy     *self.dump_field_dict['bz'][(xind+1).tolist(),yind.tolist()] + \
-                     wx     *(1.-wy)*self.dump_field_dict['bz'][xind.tolist()    ,(yind+1).tolist()] + \
-                     (1.-wx)*(1.-wy)*self.dump_field_dict['bz'][(xind+1).tolist(),(yind+1).tolist()] 
-
-            vmag = np.sqrt(self.particles[species]['vx']**2+self.particles[species]['vy']**2+self.particles[species]['vz']**2)
-            vpar = (self.particles[species]['vx']*partbx+self.particles[species]['vy']*partby+self.particles[species]['vz']*partbz)/np.sqrt(partbx**2+partby**2+partbz**2)
+            if wax == 0: # wax is just which axis defines the plane we are looking at
+                vp0 = v1
+                vp1 = v2
+                vax = v0
+            elif wax == 1:
+                vp0 = v0
+                vp1 = v1
+                vax = v2
+            elif wax == 2:
+                vp0 = v0
+                vp1 = v1
+                vax = v2
+            else :
+                print ''
+                print 'The plane axis is out of bounds fo wax = ',wax
+                print 'vdist_2d is crashing!!!!'
+                print ''
+            
+            self.vax = vax
+            self.vp = np.sqrt(vp0**2+vp1**2)
+            self.exb = exb
+            self.bxexb = bxexb
+            # This means field aligned is 0, perp is 90 and anti aligned is 180
+            pitch_angle = -1.0*(np.arctan(vax/np.sqrt(vp0**2+vp1**2))/np.pi*180. - 90.)
+            self.ptc = pitch_angle
 
 # Not sure which of these two is right
-            pitch_angle = np.arccos(vpar/vmag)/np.pi*180.
+            #pitch_angle = np.arccos(vpar/vmag)/np.pi*180.
             #pitch_angle = np.arctan(np.sqrt((vmag**2 - vpar**2)/2.)/vpar)/np.pi*180. + 90.
 
             subpartind = np.where(abs(pitch_angle - pa) < dpa/2.)
 
+            #subpart = self.particles[species][subpartind]
+            #self.subpart[species] = subpart
+            #subpitch_angle = pitch_angle[subpartind] 
 
-            subpart = self.particles[species][subpartind]
-            self.subpart[species] = subpart
-            subpitch_angle = pitch_angle[subpartind] 
-
-            print 'Total %s in pitch angle range are: %i'%(species,len(subpart))
+            #print 'Total %s in pitch angle range are: %i'%(species,len(subpart))
             return_hist_dict[species] = []
 
 #This is silly just do the whole distro right here
@@ -420,45 +477,66 @@ class p3d_dump(object):
                     KE = self.param_dict['m_e']/2.0*(self.particles[species]['vx']**2+
                                                      self.particles[species]['vy']**2+
                                                      self.particles[species]['vz']**2)
+                    #print 'More Mucking!!!'
+                    #KE = self.param_dict['m_e']/2.0*(v0**2+
+                    #                                 v1**2+
+                    #                                 v2**2)
+
                 else:
                     KE = 1.0/2.0*(self.particles[species]['vx']**2+
                                   self.particles[species]['vy']**2+
                                   self.particles[species]['vz']**2)
+                    #print 'More Mucking!!!'
+                    #KE =                    1.0/2.0*(v0**2+
+                    #                                 v1**2+
+                    #                                 v2**2)
                 #H,xedges = np.histogram(KE,**kwargs)
                 #return_hist_dict[species].append(H)
                 #return_hist_dict[species].append((xedges[:-1]+xedges[1:])/2.0)
 
-                self.KE = KE
-                self.pa = pitch_angle
 
-                H,xedges,yedges = np.histogram2d(KE,pitch_angle,**kwargs)
-                return_hist_dict[species].append(H)
+                H,xedges,yedges = np.histogram2d(pitch_angle,KE,**kwargs)
+                xx,yy = np.meshgrid(yedges,xedges)
+                eng = (xx[1:,1:]+xx[:-1,:-1])/2.
+                ynorm = (np.cos(yy[:-1,:-1]/180.*np.pi) - np.cos(yy[1:,1:]/180.*np.pi))
+                ynorm = ynorm/sum(ynorm)
+                if species == 'e':
+                    self.ynorm=ynorm
+                    self.pa = pitch_angle
+                    self.KE = KE
+                    self.eng = eng
+                    self.H = H
+                    self.yyy = yy
+                return_hist_dict[species].append(H/ynorm*eng**2)
+                #return_hist_dict[species].append(H/ynorm)
                 return_hist_dict[species].append(xedges)
                 return_hist_dict[species].append(yedges)
 
                 
             else:
-                partbx = partbx[subpartind]
-                partby = partby[subpartind]
-                partbz = partbz[subpartind]
+                #Colby devide by bin size!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-                bp11 = -1.0*partbz/np.sqrt(partbx**2 + partbz**2)
-                bp12 = 0.0*partby
-                bp13 = partbx/np.sqrt(partbx**2 + partbz**2)
+                H, xedges, yedges = np.histogram2d(vp0[subpartind],vp1[subpartind],**kwargs)
+                xx,yy = np.meshgrid(yedges,xedges)
+                print pa,dpa
 
-                bp21 = (partby*bp13 - partbz*bp12)/np.sqrt(partbx**2+partby**2+partbz**2)
-                bp22 = (partbz*bp11 - partbx*bp13)/np.sqrt(partbx**2+partby**2+partbz**2)
-                bp23 = (partbx*bp12 - partby*bp11)/np.sqrt(partbx**2+partby**2+partbz**2)
-                
-                print 'Total %s in pitch angle range are: %i'%(species,len(subpart))
+                #int_cone = 1./18.*(
+                self.inc = 1./18.*(
+                       (-xx[:-1,:-1]**3+6.*xx[:-1,:-1]*yy[:-1,:-1]*np.sqrt(xx[:-1,:-1]**2+yy[:-1,:-1]**2) + 
+                        3.*yy[:-1,:-1]**3*np.log(np.sqrt(xx[:-1,:-1]**2+yy[:-1,:-1]**2) + xx[:-1,:-1] + np.spacing(4)) + 
+                        3.*xx[:-1,:-1]**3*np.log(np.sqrt(xx[:-1,:-1]**2+yy[:-1,:-1]**2)+yy[:-1,:-1] + np.spacing(4))) -
+                       (-xx[1:,1:]**3+6.*xx[1:,1:]*yy[:-1,:-1]*np.sqrt(xx[1:,1:]**2+yy[:-1,:-1]**2) + 
+                        3.*yy[:-1,:-1]**3*np.log(np.sqrt(xx[1:,1:]**2+yy[:-1,:-1]**2) + xx[1:,1:] + np.spacing(4)) + 
+                        3.*xx[1:,1:]**3*np.log(np.sqrt(xx[1:,1:]**2+yy[:-1,:-1]**2)+yy[:-1,:-1] + np.spacing(4))) -
+                       (-xx[:-1,:-1]**3+6.*xx[:-1,:-1]*yy[1:,1:]*np.sqrt(xx[:-1,:-1]**2+yy[1:,1:]**2) + 
+                        3.*yy[1:,1:]**3*np.log(np.sqrt(xx[:-1,:-1]**2+yy[1:,1:]**2) + xx[:-1,:-1] + np.spacing(4)) + 
+                        3.*xx[:-1,:-1]**3*np.log(np.sqrt(xx[:-1,:-1]**2+yy[1:,1:]**2)+yy[1:,1:] + np.spacing(4))) +
+                       (-xx[1:,1:]**3+6.*xx[1:,1:]*yy[1:,1:]*np.sqrt(xx[1:,1:]**2+yy[1:,1:]**2) + 
+                        3.*yy[1:,1:]**3*np.log(np.sqrt(xx[1:,1:]**2+yy[1:,1:]**2) + xx[1:,1:] + np.spacing(4)) + 
+                        3.*xx[1:,1:]**3*np.log(np.sqrt(xx[1:,1:]**2+yy[1:,1:]**2)+yy[1:,1:] + np.spacing(4))))
 
-                veloperp1 = subpart['vx']*bp11+subpart['vy']*bp12+subpart['vz']*bp13
-                veloperp2 = subpart['vx']*bp21+subpart['vy']*bp22+subpart['vz']*bp23
-
-                #if kwargs.has_key('range'):
-                H, xedges, yedges = np.histogram2d(veloperp1,veloperp2,**kwargs)
-                #else:
-                #    H, xedges, yedges = np.histogram2d(veloperp1,veloperp2)
+                self.inc = self._int_cone(pa,dpa,xedges,yedges)
+                #H = H/self.inc
                 H = np.rot90(H)
                 H = np.flipud(H)
                 return_hist_dict[species].append(H)
@@ -468,101 +546,207 @@ class p3d_dump(object):
 
         return return_hist_dict
 
+    def _vdist_pizza(self,par=False,**kwargs): 
+# I have a lot of code that can return a 2D distrubution function for a givn pitch angle range
+# but I don't think that this will ever be usefull... I should remove it
+        if not kwargs.has_key('z0'): z0 = 0. #pa = pitch_angle, but I am lazy
+        else: z0 = kwargs.pop('z0') 
+        if not kwargs.has_key('dz'): dz = 1.
+        else: dz = kwargs.pop('dz') 
+        if not kwargs.has_key('wax'): wax = 0 
+        else: wax = kwargs.pop('wax') 
+
+        if par:
+            b_interp = np.array([ self.interp_field(self.dump_field_dict['bx'],self.param_dict['lx'],self.param_dict['ly'],self._r0),
+                                  self.interp_field(self.dump_field_dict['by'],self.param_dict['lx'],self.param_dict['ly'],self._r0),
+                                  self.interp_field(self.dump_field_dict['bz'],self.param_dict['lx'],self.param_dict['ly'],self._r0)])
+
+            e_interp = np.array([ self.interp_field(self.dump_field_dict['ex'],self.param_dict['lx'],self.param_dict['ly'],self._r0),
+                                  self.interp_field(self.dump_field_dict['ey'],self.param_dict['lx'],self.param_dict['ly'],self._r0),
+                                  self.interp_field(self.dump_field_dict['ez'],self.param_dict['lx'],self.param_dict['ly'],self._r0)])
+
+            exb = np.cross(e_interp,b_interp)/sum(b_interp**2)
+            exb = exb/np.sqrt(sum(exb**2))
+
+            b_interp = b_interp/np.sqrt(sum(b_interp**2))
+
+            bxexb = np.cross(b_interp,exb) 
+            print b_interp
+            print exb
+            print bxexb
+
+        velo={}
+        return_hist_dict = {}
+        self.subpart = {}
+        #print 'Mucking this up!!'
+        #Npart_2 = int(np.shape(self.particles['i']['vx'])[0]/2)
+
+        #self.particles['i']['vx'][:Npart_2] = 1.*np.random.normal(scale=1.0,size=Npart_2)
+        #self.particles['i']['vy'][:Npart_2] = 1.*np.random.normal(scale=1.0,size=Npart_2)
+        #self.particles['i']['vz'][:Npart_2] = 1.*np.random.normal(scale=1.0,size=Npart_2)
+
+        #self.particles['i']['vx'][Npart_2:] = 1.*np.random.normal(loc=10.,scale=1.0,size=Npart_2)
+        #self.particles['i']['vy'][Npart_2:] = 1.*np.random.normal(loc=4.,scale=1.0,size=Npart_2)
+        #self.particles['i']['vz'][Npart_2:] = 1.*np.random.normal(loc=4.,scale=1.0,size=Npart_2)
+        ##print 'Done Mucking this up!!!'
+        for species in self.species:
+            return_hist_dict[species] = []
+       
+            if par:
+                v0 = (b_interp[0]*self.particles[species]['vx']+
+                      b_interp[1]*self.particles[species]['vy']+
+                      b_interp[2]*self.particles[species]['vz'])
+
+                v1 = (exb[0]*self.particles[species]['vx']+
+                      exb[1]*self.particles[species]['vy']+
+                      exb[2]*self.particles[species]['vz'])
+
+                v2 = (bxexb[0]*self.particles[species]['vx']+
+                      bxexb[1]*self.particles[species]['vy']+
+                      bxexb[2]*self.particles[species]['vz'])
+                #print 'Mucking this up!!!'
+                #Npart = 100000
+                #v0 = 1.*np.random.normal(scale=3.0,size=Npart)
+                #v1 = 1.*np.random.normal(scale=1.0,size=Npart)
+                #v2 = 1.*np.random.normal(scale=1.0,size=Npart)
+            else:
+                v0 = self.particles[species]['vx']
+                v1 = self.particles[species]['vy']
+                v2 = self.particles[species]['vz']
+
+            if wax == 0: # wax is just which axis defines the plane we are looking at
+                vp0 = v1
+                vp1 = v2
+                vax = v0
+            elif wax == 1:
+                vp0 = v0
+                vp1 = v1
+                vax = v2
+            elif wax == 2:
+                vp0 = v0
+                vp1 = v1
+                vax = v2
+            else :
+                print ''
+                print 'The plane axis is out of bounds fo wax = ',wax
+                print 'vdist_2d is crashing!!!!'
+                print ''
+            
+            subpartind = np.where(abs(vax - z0) < dz/2.)
+
+            H, xedges, yedges = np.histogram2d(vp0[subpartind],vp1[subpartind],**kwargs)
+
+            H = np.rot90(H)
+            H = np.flipud(H)
+            return_hist_dict[species].append(H)
+            return_hist_dict[species].append(xedges)
+            return_hist_dict[species].append(yedges)
+
+
+        return return_hist_dict
+
+
+
+
     def _vdist_2d_par(self,**kwargs):
         """
-        Colby you are sooooo  dumb
-        right now the pitch version of this code dots every partical with its local B
-        And this just dots them all with a constant B, which seems dumb, you should fix this!
+        I dont know what is better
+            To rotate all particles to a particular b feild
+            or rotate all particles to their own b field?
+
+            right now each part has its own b field
         """
         
-        bx_interp = self.interp_field(self.dump_field_dict['bx'],self.param_dict['lx'],self.param_dict['ly'],self._r0)
-        by_interp = self.interp_field(self.dump_field_dict['by'],self.param_dict['lx'],self.param_dict['ly'],self._r0)
-        bz_interp = self.interp_field(self.dump_field_dict['bz'],self.param_dict['lx'],self.param_dict['ly'],self._r0)
-        bmag_interp = (bx_interp**2+by_interp**2+bz_interp**2)**.5
+        b_interp = np.array([ self.interp_field(self.dump_field_dict['bx'],self.param_dict['lx'],self.param_dict['ly'],self._r0),
+                           self.interp_field(self.dump_field_dict['by'],self.param_dict['lx'],self.param_dict['ly'],self._r0),
+                           self.interp_field(self.dump_field_dict['bz'],self.param_dict['lx'],self.param_dict['ly'],self._r0)])
+        b_interp = b_interp/np.sqrt(sum(b_interp**2))
 
+        e_interp = np.array([ self.interp_field(self.dump_field_dict['ex'],self.param_dict['lx'],self.param_dict['ly'],self._r0),
+                           self.interp_field(self.dump_field_dict['ey'],self.param_dict['lx'],self.param_dict['ly'],self._r0),
+                           self.interp_field(self.dump_field_dict['ez'],self.param_dict['lx'],self.param_dict['ly'],self._r0)])
 
+        print 'b_interp'
+        print b_interp
+        self.trash1 = b_interp
+        print 'e_interp'
+        print e_interp
+        self.trash2 = e_interp
 
+        exb = np.cross(e_interp,b_interp) 
+        exb = exb/np.sqrt(sum(exb**2))
 
+        bxexb = np.cross(b_interp,exb) 
 
-
-        if by_interp > 0.:
-            b_perp1x = 0.
-            b_perp1y = -1.*bz_interp/(bz_interp**2 + by_interp**2)**(.5)
-            b_perp1z = by_interp/(bx_interp**2 + by_interp**2)**(.5)
-        else:
-            b_perp1x = 0.
-            b_perp1y = bz_interp/(bz_interp**2 + by_interp**2)**(.5)
-            b_perp1z = -1.*by_interp/(bx_interp**2 + by_interp**2)**(.5)
-
-        b_perpmag = (b_perp1x**2+b_perp1y**2+b_perp1z**2)**.5
-        b_perp1x = b_perp1x/b_perpmag
-        b_perp1y = b_perp1y/b_perpmag
-        b_perp1z = b_perp1z/b_perpmag
-
-        b_perp2x = (by_interp*b_perp1z - bz_interp*b_perp1y)
-        b_perp2y = (bz_interp*b_perp1x - bx_interp*b_perp1z)
-        b_perp2z = (bx_interp*b_perp1y - by_interp*b_perp1x)
-        b_perpmag = (b_perp2x**2+b_perp2y**2+b_perp2z**2)**.5
-        b_perp2x = b_perp2x/b_perpmag
-        b_perp2y = b_perp2y/b_perpmag
-        b_perp2z = b_perp2z/b_perpmag
-
-        #print '%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%'
-        #print '%%%%%%%%%%%%%%%%%%%%%%%%%%% DEBUG %%%%%%%%%%%%%%%%%%%%%%%%%%%'
-        #print 'bx,by,bz = %1.2f, %1.2f, %1.2f'%(bx_interp,by_interp,bz_interp)
-        #print '1x,1y,1z = %1.2f, %1.2f, %1.2f'%(b_perp1x,b_perp1y,b_perp1z)
-        #print '2x,2y,2z = %1.2f, %1.2f, %1.2f'%(b_perp2x,b_perp2y,b_perp2z)
-        #print '%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%'
-        #print '%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%'
+        if abs(sum(bxexb**2) - 1.0) > .001:
+            print '###################### WARNING ######################'
+            print '      your b and exb seem to not be perpandicular!!!'
+            bxexb = bxexb/np.sqrt(sum(bxexb**2))
 
         #qc#print 'Rotating Velocties'
         velo={}
         for species in self.species:
             velo[species] = {}
 
-            delx = self.param_dict['lx']*1.0/self.param_dict['pex']/self.param_dict['nx']
-            dely = self.param_dict['ly']*1.0/(self.param_dict['pey']*self.param_dict['ny'])
+            rotate_all_parts = False
+            if rotate_all_parts == True:
 
-            xind = (np.floor((self.particles[species]['x']-delx/2.0)/delx)).astype(int)
-            yind = (np.floor((self.particles[species]['y']-dely/2.0)/dely)).astype(int)
+                delx = self.param_dict['lx']*1.0/self.param_dict['pex']/self.param_dict['nx']
+                dely = self.param_dict['ly']*1.0/(self.param_dict['pey']*self.param_dict['ny'])
 
-            wx = (self.particles[species]['x']-delx/2.0)%delx
-            wy = (self.particles[species]['y']-dely/2.0)%dely
+                xind = (np.floor((self.particles[species]['x']-delx/2.0)/delx)).astype(int)
+                yind = (np.floor((self.particles[species]['y']-dely/2.0)/dely)).astype(int)
 
-            partbx = wx     *wy     *self.dump_field_dict['bx'][xind.tolist()    ,yind.tolist()] + \
-                     (1.-wx)*wy     *self.dump_field_dict['bx'][(xind+1).tolist(),yind.tolist()] + \
-                     wx     *(1.-wy)*self.dump_field_dict['bx'][xind.tolist()    ,(yind+1).tolist()] + \
-                     (1.-wx)*(1.-wy)*self.dump_field_dict['bx'][(xind+1).tolist(),(yind+1).tolist()] 
+                wx = (self.particles[species]['x']-delx/2.0)%delx
+                wy = (self.particles[species]['y']-dely/2.0)%dely
 
-            partby = wx     *wy     *self.dump_field_dict['by'][xind.tolist()    ,yind.tolist()] + \
-                     (1.-wx)*wy     *self.dump_field_dict['by'][(xind+1).tolist(),yind.tolist()] + \
-                     wx     *(1.-wy)*self.dump_field_dict['by'][xind.tolist()    ,(yind+1).tolist()] + \
-                     (1.-wx)*(1.-wy)*self.dump_field_dict['by'][(xind+1).tolist(),(yind+1).tolist()] 
+                partbx = wx     *wy     *self.dump_field_dict['bx'][xind.tolist()    ,yind.tolist()] + \
+                         (1.-wx)*wy     *self.dump_field_dict['bx'][(xind+1).tolist(),yind.tolist()] + \
+                         wx     *(1.-wy)*self.dump_field_dict['bx'][xind.tolist()    ,(yind+1).tolist()] + \
+                         (1.-wx)*(1.-wy)*self.dump_field_dict['bx'][(xind+1).tolist(),(yind+1).tolist()] 
 
-            partbz = wx     *wy     *self.dump_field_dict['bz'][xind.tolist()    ,yind.tolist()] + \
-                     (1.-wx)*wy     *self.dump_field_dict['bz'][(xind+1).tolist(),yind.tolist()] + \
-                     wx     *(1.-wy)*self.dump_field_dict['bz'][xind.tolist()    ,(yind+1).tolist()] + \
-                     (1.-wx)*(1.-wy)*self.dump_field_dict['bz'][(xind+1).tolist(),(yind+1).tolist()] 
+                partby = wx     *wy     *self.dump_field_dict['by'][xind.tolist()    ,yind.tolist()] + \
+                         (1.-wx)*wy     *self.dump_field_dict['by'][(xind+1).tolist(),yind.tolist()] + \
+                         wx     *(1.-wy)*self.dump_field_dict['by'][xind.tolist()    ,(yind+1).tolist()] + \
+                         (1.-wx)*(1.-wy)*self.dump_field_dict['by'][(xind+1).tolist(),(yind+1).tolist()] 
 
-            (partbx,partby,partbz) = (partbx/np.sqrt(partbx**2+partby**2+partbz**2),
-                                      partby/np.sqrt(partbx**2+partby**2+partbz**2),
-                                      partbz/np.sqrt(partbx**2+partby**2+partbz**2))
+                partbz = wx     *wy     *self.dump_field_dict['bz'][xind.tolist()    ,yind.tolist()] + \
+                         (1.-wx)*wy     *self.dump_field_dict['bz'][(xind+1).tolist(),yind.tolist()] + \
+                         wx     *(1.-wy)*self.dump_field_dict['bz'][xind.tolist()    ,(yind+1).tolist()] + \
+                         (1.-wx)*(1.-wy)*self.dump_field_dict['bz'][(xind+1).tolist(),(yind+1).tolist()] 
 
-            partpb1 =  0.0*partbx
-            partpb2 = -1.*np.sign(by_interp)*partbz/(partbz**2 + partby**2)**(.5)
-            partpb3 = 1.*np.sign(by_interp)*partby/(partbx**2 + partby**2)**(.5)
+                (partbx,partby,partbz) = (partbx/np.sqrt(partbx**2+partby**2+partbz**2),
+                                          partby/np.sqrt(partbx**2+partby**2+partbz**2),
+                                          partbz/np.sqrt(partbx**2+partby**2+partbz**2))
 
-            (partpb1,partpb2,partpb3) = (partpb1/np.sqrt(partpb1**2+partpb2**2+partpb3**2),
-                                         partpb2/np.sqrt(partpb1**2+partpb2**2+partpb3**2),
-                                         partpb3/np.sqrt(partpb1**2+partpb2**2+partpb3**2))
+                partpb1 =  0.0*partbx
+                partpb2 = -1.*np.sign(by_interp)*partbz/(partbz**2 + partby**2)**(.5)
+                partpb3 = 1.*np.sign(by_interp)*partby/(partbx**2 + partby**2)**(.5)
 
-            partpp1 =  (partby*partpb3 - partbz*partpb2)
-            partpp2 =  (partbz*partpb1 - partbx*partpb3)
-            partpp3 =  (partbx*partpb2 - partby*partpb1)
+                (partpb1,partpb2,partpb3) = (partpb1/np.sqrt(partpb1**2+partpb2**2+partpb3**2),
+                                             partpb2/np.sqrt(partpb1**2+partpb2**2+partpb3**2),
+                                             partpb3/np.sqrt(partpb1**2+partpb2**2+partpb3**2))
 
-            velo[species]['par']   = (partbx*self.particles[species]['vx']+partby*self.particles[species]['vy']+partbz*self.particles[species]['vz'])
-            velo[species]['perp1'] = (partpb1*self.particles[species]['vx']+partpb2*self.particles[species]['vy']+partpb3*self.particles[species]['vz'])
-            velo[species]['perp2'] = (partpp1*self.particles[species]['vx']+partpp2*self.particles[species]['vy']+partpp3*self.particles[species]['vz'])
+                partpp1 =  (partby*partpb3 - partbz*partpb2)
+                partpp2 =  (partbz*partpb1 - partbx*partpb3)
+                partpp3 =  (partbx*partpb2 - partby*partpb1)
+
+                velo[species]['par']   = (partbx*self.particles[species]['vx']+partby*self.particles[species]['vy']+partbz*self.particles[species]['vz'])
+                velo[species]['perp1'] = (partpb1*self.particles[species]['vx']+partpb2*self.particles[species]['vy']+partpb3*self.particles[species]['vz'])
+                velo[species]['perp2'] = (partpp1*self.particles[species]['vx']+partpp2*self.particles[species]['vy']+partpp3*self.particles[species]['vz'])
+
+            else:
+                velo[species]['par']   = (b_interp[0]*self.particles[species]['vx']+
+                                          b_interp[1]*self.particles[species]['vy']+
+                                          b_interp[2]*self.particles[species]['vz'])
+
+                velo[species]['perp1'] = (exb[0]*self.particles[species]['vx']+
+                                          exb[1]*self.particles[species]['vy']+
+                                          exb[2]*self.particles[species]['vz'])
+
+                velo[species]['perp2'] = (bxexb[0]*self.particles[species]['vx']+
+                                          bxexb[1]*self.particles[species]['vy']+
+                                          bxexb[2]*self.particles[species]['vz'])
 
 
         #velo['e']['par']   = (bx_interp*self.particles['e']['vx']+by_interp*self.particles['e']['vy']+bz_interp*self.particles['e']['vz'])/bmag_interp
@@ -580,17 +764,17 @@ class p3d_dump(object):
 # H needs to be rotated and flipped
             H = np.rot90(H)
             H = np.flipud(H)
-            return_hist_dict[species].append(['V_Parallel vs V_Perp 1 (+zy)',H,xedges,yedges])
+            return_hist_dict[species].append(['V_b vs V_exb',H,xedges,yedges])
 
             H, xedges, yedges = np.histogram2d(velo[species]['par'],velo[species]['perp2'],**kwargs)
             H = np.rot90(H)
             H = np.flipud(H)
-            return_hist_dict[species].append(['V_Parallel vs V_Perp 2',H,xedges,yedges])
+            return_hist_dict[species].append(['V_b vs V_bxexb 2',H,xedges,yedges])
 
             H, xedges, yedges = np.histogram2d(velo[species]['perp1'],velo[species]['perp2'],**kwargs)
             H = np.rot90(H)
             H = np.flipud(H)
-            return_hist_dict[species].append(['V_Perp 1 (+zy) vs V_Perp 2',H,xedges,yedges])
+            return_hist_dict[species].append(['V_exb 1 vs V_bxexb',H,xedges,yedges])
 
 # Mask zeros
          #Hmasked = np.ma.masked_where(H==0,H)
@@ -606,23 +790,71 @@ class p3d_dump(object):
         return_hist_dict = {}
         return_hist_dict['i'] = []
         return_hist_dict['e'] = []
-      
-        for species in self.species:
-            H, xedges, yedges = np.histogram2d(self.particles[species]['vx'],self.particles[species]['vy'],**kwargs)
+        if kwargs.has_key('gen_vec'):
+            gvec = kwargs.pop('gen_vec')
+            vec1 = np.array(gvec[0])
+            vec2 = np.array(gvec[1])
+            vec1 = vec1/np.sqrt(np.sum(vec1**2))
+            vec2 = vec2/np.sqrt(np.sum(vec2**2))
+            if abs(np.dot(vec1,vec2)) > 10e-4:
+                print ''
+                print 'The two vectors given are not orthognal!!!!'
+                print 'The exception for handeling this has not been coded'
+                print 'kindly fix your shit and try again ~Colby'
+                print ''
+                return -1
+            else:
+                vec3 = np.cross(vec1,vec2)
+
+            velo = {}
+            for species in self.species:
+
+                velo[species] = {}
+
+                velo[species]['v1']   = (vec1[0]*self.particles[species]['vx']+
+                                         vec1[1]*self.particles[species]['vy']+
+                                         vec1[2]*self.particles[species]['vz'])
+
+                velo[species]['v2'] = (vec2[0]*self.particles[species]['vx']+
+                                       vec2[1]*self.particles[species]['vy']+
+                                       vec2[2]*self.particles[species]['vz'])
+
+                velo[species]['v3'] = (vec3[0]*self.particles[species]['vx']+
+                                       vec3[1]*self.particles[species]['vy']+
+                                       vec3[2]*self.particles[species]['vz'])
+
+                H, xedges, yedges = np.histogram2d(velo[species]['v1'],velo[species]['v2'],**kwargs)
 # H needs to be rotated and flipped
-            H = np.rot90(H)
-            H = np.flipud(H)
-            return_hist_dict[species].append(['V_X vs V_Y',H,(xedges[1:]+xedges[:-1])/2.,(yedges[1:]+yedges[:-1])/2.])
+                H = np.rot90(H)
+                H = np.flipud(H)
+                return_hist_dict[species].append(['V_1 vs V_2',H,xedges,yedges])
 
-            H, xedges, yedges = np.histogram2d(self.particles[species]['vx'],self.particles[species]['vz'],**kwargs)
-            H = np.rot90(H)
-            H = np.flipud(H)
-            return_hist_dict[species].append(['V_X vs V_Z',H,(xedges[1:]+xedges[:-1])/2.,(yedges[1:]+yedges[:-1])/2.])
+                H, xedges, yedges = np.histogram2d(velo[species]['v1'],velo[species]['v3'],**kwargs)
+                H = np.rot90(H)
+                H = np.flipud(H)
+                return_hist_dict[species].append(['V_1 vs V_3',H,xedges,yedges])
 
-            H, xedges, yedges = np.histogram2d(self.particles[species]['vy'],self.particles[species]['vz'],**kwargs)
-            H = np.rot90(H)
-            H = np.flipud(H)
-            return_hist_dict[species].append(['V_Y vs V_Z',H,(xedges[1:]+xedges[:-1])/2.,(yedges[1:]+yedges[:-1])/2.])
+                H, xedges, yedges = np.histogram2d(velo[species]['v2'],velo[species]['v3'],**kwargs)
+                H = np.rot90(H)
+                H = np.flipud(H)
+                return_hist_dict[species].append(['V_2 vs V_3',H,xedges,yedges])
+        else:
+            for species in self.species:
+                H, xedges, yedges = np.histogram2d(self.particles[species]['vx'],self.particles[species]['vy'],**kwargs)
+# H needs to be rotated and flipped
+                H = np.rot90(H)
+                H = np.flipud(H)
+                return_hist_dict[species].append(['V_X vs V_Y',H,xedges,yedges])
+
+                H, xedges, yedges = np.histogram2d(self.particles[species]['vx'],self.particles[species]['vz'],**kwargs)
+                H = np.rot90(H)
+                H = np.flipud(H)
+                return_hist_dict[species].append(['V_X vs V_Z',H,xedges,yedges])
+
+                H, xedges, yedges = np.histogram2d(self.particles[species]['vy'],self.particles[species]['vz'],**kwargs)
+                H = np.rot90(H)
+                H = np.flipud(H)
+                return_hist_dict[species].append(['V_Y vs V_Z',H,xedges,yedges])
 
 # Mask zeros
          #Hmasked = np.ma.masked_where(H==0,H)
@@ -648,11 +880,12 @@ class p3d_dump(object):
         """
         x0 = r0[0]
         y0 = r0[1]
-        if isinstance(dx,list):
+        if isinstance(dx,float) or isinstance(dx,float):
+            dx = dx*1.0
+            dy = dx       # Square box is assumed
+        else:
             dy = dx[1]
             dx = dx[0]
-        else: 
-            dy = dx       # Square box is assumed
 
         #qc#print 'r0 = [%f,%f] and dx = [%f,%f]'%(x0,y0,dx,dy)
 # Figure out which set of processors we are on
@@ -813,8 +1046,60 @@ class p3d_dump(object):
             else:
                 return '00'+str(num)
 
+    def _int_cone(self,pa,dpa,xedges,yedges):
+        """
+#---------------------------------------------------------------------------------------------------------------
+#   Method      : _int_cone
+#
+#   Discription : This integrates a cone over a differental grid
+#
+#   Args        : xedges the x edges of the histogram
+#               : yedges the y edges of the histogram
+#
+#   Comments    : I think this is working ok? 
+#---------------------------------------------------------------------------------------------------------------
+        """
+        
 
-    def interp_field(self,field,lx='not_set',ly='not_set',r0='not_set'):
+        xx,yy = np.meshgrid(yedges,xedges)
+        intcone = 1./18.*(
+               (-xx[:-1,:-1]**3+6.*xx[:-1,:-1]*yy[:-1,:-1]*np.sqrt(xx[:-1,:-1]**2+yy[:-1,:-1]**2) + 
+                3.*yy[:-1,:-1]**3*np.log(np.sqrt(xx[:-1,:-1]**2+yy[:-1,:-1]**2) + xx[:-1,:-1] + np.spacing(4)) + 
+                3.*xx[:-1,:-1]**3*np.log(np.sqrt(xx[:-1,:-1]**2+yy[:-1,:-1]**2)+yy[:-1,:-1] + np.spacing(4))) -
+               (-xx[1:,1:]**3+6.*xx[1:,1:]*yy[:-1,:-1]*np.sqrt(xx[1:,1:]**2+yy[:-1,:-1]**2) + 
+                3.*yy[:-1,:-1]**3*np.log(np.sqrt(xx[1:,1:]**2+yy[:-1,:-1]**2) + xx[1:,1:] + np.spacing(4)) + 
+                3.*xx[1:,1:]**3*np.log(np.sqrt(xx[1:,1:]**2+yy[:-1,:-1]**2)+yy[:-1,:-1] + np.spacing(4))) -
+               (-xx[:-1,:-1]**3+6.*xx[:-1,:-1]*yy[1:,1:]*np.sqrt(xx[:-1,:-1]**2+yy[1:,1:]**2) + 
+                3.*yy[1:,1:]**3*np.log(np.sqrt(xx[:-1,:-1]**2+yy[1:,1:]**2) + xx[:-1,:-1] + np.spacing(4)) + 
+                3.*xx[:-1,:-1]**3*np.log(np.sqrt(xx[:-1,:-1]**2+yy[1:,1:]**2)+yy[1:,1:] + np.spacing(4))) +
+               (-xx[1:,1:]**3+6.*xx[1:,1:]*yy[1:,1:]*np.sqrt(xx[1:,1:]**2+yy[1:,1:]**2) + 
+                3.*yy[1:,1:]**3*np.log(np.sqrt(xx[1:,1:]**2+yy[1:,1:]**2) + xx[1:,1:] + np.spacing(4)) + 
+                3.*xx[1:,1:]**3*np.log(np.sqrt(xx[1:,1:]**2+yy[1:,1:]**2)+yy[1:,1:] + np.spacing(4))))
+
+        norm = 1./18.*(
+               (-xx[0,0]**3+6.*xx[0,0]*yy[0,0]*np.sqrt(xx[0,0]**2+yy[0,0]**2) + 
+                3.*yy[0,0]**3*np.log(np.sqrt(xx[0,0]**2+yy[0,0]**2) + xx[0,0] + np.spacing(4)) + 
+                3.*xx[0,0]**3*np.log(np.sqrt(xx[0,0]**2+yy[0,0]**2)+yy[0,0] + np.spacing(4))) -
+               (-xx[-1,-1]**3+6.*xx[-1,-1]*yy[0,0]*np.sqrt(xx[-1,-1]**2+yy[0,0]**2) + 
+                3.*yy[0,0]**3*np.log(np.sqrt(xx[-1,-1]**2+yy[0,0]**2) + xx[-1,-1] + np.spacing(4)) + 
+                3.*xx[-1,-1]**3*np.log(np.sqrt(xx[-1,-1]**2+yy[0,0]**2)+yy[0,0] + np.spacing(4))) -
+               (-xx[0,0]**3+6.*xx[0,0]*yy[-1,-1]*np.sqrt(xx[0,0]**2+yy[-1,-1]**2) + 
+                3.*yy[-1,-1]**3*np.log(np.sqrt(xx[0,0]**2+yy[-1,-1]**2) + xx[0,0] + np.spacing(4)) + 
+                3.*xx[0,0]**3*np.log(np.sqrt(xx[0,0]**2+yy[-1,-1]**2)+yy[-1,-1] + np.spacing(4))) +
+               (-xx[-1,-1]**3+6.*xx[-1,-1]*yy[-1,-1]*np.sqrt(xx[-1,-1]**2+yy[-1,-1]**2) + 
+                3.*yy[-1,-1]**3*np.log(np.sqrt(xx[-1,-1]**2+yy[-1,-1]**2) + xx[-1,-1] + np.spacing(4)) + 
+                3.*xx[-1,-1]**3*np.log(np.sqrt(xx[-1,-1]**2+yy[-1,-1]**2)+yy[-1,-1] + np.spacing(4))))
+        
+        self.normie=norm
+
+        print 'norm = ',norm
+        print 'otha = ',abs(1./np.tan((pa-dpa/2.)/180.*np.pi) - 1./np.tan((pa+dpa/2.)/180.*np.pi))
+
+        #return intcone/norm#*abs(1./np.tan((pa-dpa/2.)/180.*np.pi) - 1./np.tan((pa+dpa/2.)/180.*np.pi))
+        return intcone/intcone.min()#*abs(1./np.tan((pa-dpa/2.)/180.*np.pi) - 1./np.tan((pa+dpa/2.)/180.*np.pi))
+
+
+    def interp_field(self,field,lx=None,ly=None,r0=None):
         """
 #---------------------------------------------------------------------------------------------------------------
 #   Method      : interp_field
@@ -830,9 +1115,9 @@ class p3d_dump(object):
 #               : the internally saved field. so CODE IN THE FUTURE
 #---------------------------------------------------------------------------------------------------------------
         """
-        if lx=='not_set':lx=self.param_dict['lx']
-        if ly=='not_set':ly=self.param_dict['ly']
-        if r0=='not_set':r0=self._r0
+        if lx is None:lx=self.param_dict['lx']
+        if ly is None:ly=self.param_dict['ly']
+        if r0 is None:r0=self._r0
 
         nx = len(field[0,:])
         ny = len(field[:,0])
@@ -844,11 +1129,16 @@ class p3d_dump(object):
 
         if jp + 1 > ny-1: jpp1 = 0
         else: jpp1 = jp+1
+
         print ip,jp,nx,ny
-        weight_x = 1.0*r0[0]/lx*nx - np.floor(1.0*r0[0]/lx*nx)
-        weight_y = 1.0*r0[1]/ly*ny - np.floor(1.0*r0[1]/ly*ny)
-        return np.array([(1.-weight_x)*(1.-weight_y)*field[jp,ip] + (weight_x)*(1.-weight_y)*field[jpp1,ip] \
-               + (1.-weight_x)*(weight_y)*field[jp,ipp1]+ (weight_x)*(weight_y)*field[jpp1,ipp1]])
+
+        wx = 1.0*r0[0]/lx*nx - np.floor(1.0*r0[0]/lx*nx)
+        wy = 1.0*r0[1]/ly*ny - np.floor(1.0*r0[1]/ly*ny)
+
+        return (1.-wx)*(1.-wy)*field[jp,ip]   +\
+               (wx)   *(1.-wy)*field[jpp1,ip] +\
+               (1.-wx)*   (wy)*field[jp,ipp1] +\
+               (wx)   *   (wy)*field[jpp1,ipp1]
     
 
 
@@ -862,7 +1152,39 @@ def convert(val):
             pass
             
 
-
+#c# This was a set of code I used to rotate each particle indviduly
+#c# Mike insists this is silly, so we will not be using this
+#c#            rotate_all_parts = False
+#c#            if rotate_all_parts == True:
+#c#
+#c#                xind = (np.floor((self.particles[species]['x']-delx/2.0)/delx)).astype(int)
+#c#                yind = (np.floor((self.particles[species]['y']-dely/2.0)/dely)).astype(int)
+#c#
+#c#                wx = (self.particles[species]['x']-delx/2.0)%delx
+#c#                wy = (self.particles[species]['y']-dely/2.0)%dely
+#c#
+#c#                (1.-wx)*(1.-wy)
+#c#                (1.-wx)*wy     
+#c#                wx     *(1.-wy)
+#c#                wx     *wy     
+#c#
+#c#                partbx = (1.-wx)*(1.-wy)*self.dump_field_dict['bx'][xind.tolist()    ,yind.tolist()] + \
+#c#                         (1.-wx)*wy     *self.dump_field_dict['bx'][(xind+1).tolist(),yind.tolist()] + \
+#c#                         wx     *(1.-wy)*self.dump_field_dict['bx'][xind.tolist()    ,(yind+1).tolist()] + \
+#c#                         wx     *wy     *self.dump_field_dict['bx'][(xind+1).tolist(),(yind+1).tolist()] 
+#c#
+#c#                partby = (1.-wx)*(1.-wy)*self.dump_field_dict['by'][xind.tolist()    ,yind.tolist()] + \
+#c#                         (1.-wx)*wy     *self.dump_field_dict['by'][(xind+1).tolist(),yind.tolist()] + \
+#c#                         wx     *(1.-wy)*self.dump_field_dict['by'][xind.tolist()    ,(yind+1).tolist()] + \
+#c#                         wx     *wy     *self.dump_field_dict['by'][(xind+1).tolist(),(yind+1).tolist()] 
+#c#
+#c#                partbz = (1.-wx)*(1.-wy)*self.dump_field_dict['bz'][xind.tolist()    ,yind.tolist()] + \
+#c#                         (1.-wx)*wy     *self.dump_field_dict['bz'][(xind+1).tolist(),yind.tolist()] + \
+#c#                         wx     *(1.-wy)*self.dump_field_dict['bz'][xind.tolist()    ,(yind+1).tolist()] + \
+#c#                         wx     *wy     *self.dump_field_dict['bz'][(xind+1).tolist(),(yind+1).tolist()] 
+#c#
+#c#                vmag = np.sqrt(self.particles[species]['vx']**2+self.particles[species]['vy']**2+self.particles[species]['vz']**2)
+#c#                vpar = (self.particles[species]['vx']*partbx+self.particles[species]['vy']*partby+self.particles[species]['vz']*partbz)/np.sqrt(partbx**2+partby**2+partbz**2)
 
 
 
