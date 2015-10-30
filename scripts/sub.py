@@ -4,6 +4,7 @@ from scipy.io.idl import readsav
 from matplotlib.ticker import AutoMinorLocator
 from p3d_runs import p3d_run
 
+#======================================================
 def set_local(IDL_restore,lcl):
     #lcl = locals()
     print 'Setting B ...'
@@ -43,6 +44,7 @@ def set_local(IDL_restore,lcl):
                                                [IDL_restore['pexz'],IDL_restore['peyz'],IDL_restore['pezz']]])
 
 
+#======================================================
 def TestTen(var,lcl,av=''):
     if var+'xx'+av in lcl and var+'yy'+av in lcl and var+'zz'+av in lcl and var+'xy'+av in lcl and var+'yz'+av in lcl and var+'yz'+av in lcl:
         return True
@@ -50,56 +52,76 @@ def TestTen(var,lcl,av=''):
         return False
 
 #======================================================
-def rotate_ten(IDL_restore,var='pi'):
-    bmag = sqrt( CR['bxav']**2+
-                 CR['byav']**2+
-                 CR['bzav']**2)
-    bbx = CR['bxav']/bmag
-    bby = CR['byav']/bmag
-    bbz = CR['bzav']/bmag
+def rotate_ten(CR,var='pi',av='av'):
+    bmag = np.sqrt( CR['bx'+av]**2+
+                    CR['by'+av]**2+
+                    CR['bz'+av]**2)
+    bbx = CR['bx'+av]/bmag
+    bby = CR['by'+av]/bmag
+    bbz = CR['bz'+av]/bmag
 
-    if var+'parav' in IDL_restore.keys():
+    if var+'par'+av in CR.keys():
         print 'Warning: %sparav was found in the restored data: nothing will be rotated!!!!'
         pass
     else:
-        CR[var+'parav'] = (bbx*(bbx*CR[var+'xxav'] + bby*CR[var+'xyav'] + bbz*CR[var+'xzav']) +
-                           bby*(bbx*CR[var+'xyav'] + bby*CR[var+'yyav'] + bbz*CR[var+'yzav']) +
-                           bbz*(bbx*CR[var+'xzav'] + bby*CR[var+'yzav'] + bbz*CR[var+'zzav']))
+        CR[var+'par'+av] = (bbx*(bbx*CR[var+'xx'+av] + bby*CR[var+'xy'+av] + bbz*CR[var+'xz'+av]) +
+                           bby*(bbx*CR[var+'xy'+av] + bby*CR[var+'yy'+av] + bbz*CR[var+'yz'+av]) +
+                           bbz*(bbx*CR[var+'xz'+av] + bby*CR[var+'yz'+av] + bbz*CR[var+'zz'+av]))
 
-        CR[var+'perp1av'] = (CR[var+'xxav'] + CR[var+'yyav'] +CR[var+'zzav'] - CR[var+'parav'])/2.
-        CR[var+'perp2av'] = CR[var+'perp1av']
+        CR[var+'perp1'+av] = (CR[var+'xx'+av] + CR[var+'yy'+av] +CR[var+'zz'+av] - CR[var+'par'+av])/2.
+        CR[var+'perp2'+av] = CR[var+'perp1'+av]
 
 #======================================================
 
-def ims(fdic,key,ax=None,ordflg='idl',**kwargs):
+def ims(fdic,key,ax=None,extent='',**kwargs):
     """
     A wrapper function for imshow to do most tedious stuff for my simulations
     """
     if ax is None: ax = plt.gca()
 
-    if ordflg == 'idl': plt_val = fdic[key]
-        
-    else: plt_val = fdic[key].T
 # Use the dict values of xx and yy to set extent
-    extent = [fdic['xx'][0],
-              fdic['xx'][-1],
-              fdic['yy'][0],
-              fdic['yy'][-1]]
+    ext = [fdic['xx'][0],
+           fdic['xx'][-1],
+           fdic['yy'][0],
+           fdic['yy'][-1]]
+
+    if type(key) is str: plt_val = fdic[key]
+    else               : plt_val = key
 
     if kwargs.has_key('cmap'): cmap=kwargs.pop('cmap')
     else:                      cmap='PuOr'
 
     return_ims = ax.imshow(plt_val,
                            origin='low',
-                           extent=extent,
+                           extent=ext,
                            cmap=cmap,            # I just love this color map
                            **kwargs)
 
-    # Giveing the plot minor tick marks
-    minorLocator = AutoMinorLocator()
-    ax.yaxis.set_minor_locator(minorLocator)
+    if type(extent) is not str:
+        ax.set_xlim(extent[:2])
+        ax.set_ylim(extent[2:])
+    ax.autoscale(False)
+
+    ax.set_xlabel(r'$X (d_i)$',size=8)
+    ax.set_ylabel(r'$Y (d_i)$',size=8)
+
+    ax.xaxis.set_tick_params(which='both',labelsize=8)
     minorLocator = AutoMinorLocator()           # Note the second call is so that the minor x ticks are not
     ax.xaxis.set_minor_locator(minorLocator)    # the same as the y ticks
+
+    ax.yaxis.set_tick_params(which='both',labelsize=8)
+    minorLocator = AutoMinorLocator()
+    ax.yaxis.set_minor_locator(minorLocator)
+
+    # Code to implement for a cbar
+    #divider = make_axes_locatable(ax)
+    #cax = divider.append_axes("right", "3%", pad="1.5%")
+    #plt.colorbar(im, cax=cax)
+
+    #cax.xaxis.set_tick_params(which='both',labelsize=8)
+    #cax.yaxis.set_tick_params(which='both',labelsize=8)
+
+    # Giveing the plot minor tick marks
 
     plt.draw()
     return return_ims
@@ -129,10 +151,12 @@ def var_at(fdic,key,r0,ordflg='idl'):
 
     return var
 
+#======================================================
 
 def load_movie(**kwargs):
-    print 'not coded yet...'
     return p3d_run('local').load_movie('all')
+
+#======================================================
 
 def show_energy(fname=None):
     if fname is None:
@@ -146,4 +170,66 @@ def show_energy(fname=None):
     f.close()
 
     return np.array(eng)
+
+#======================================================
+
+def calc_psi(CR):
+# Calculating Psi                                                                                   
+    if 'bzav' in CR:
+        bx = CR['bxav']
+        by = CR['byav']
+    else:
+        bx = CR['bx']
+        by = CR['by']
+    psi = 0.0*bx
+    psi[0,1:] = np.cumsum(by[0,1:])*(CR['yy'][2] - CR['yy'][1])
+    psi[1:,:] = psi[0,:] - np.cumsum(bx[1:,:],axis=0)*(CR['xx'][2] - CR['xx'][1])
+    return psi
+
+#======================================================
+
+def plot_line(itcpt,dir='y',ax=None,**kwargs):
+    if ax is None:
+        ax = plt.gca()
+    
+    xarr = array(ax.get_xlim())
+    yarr = array(ax.get_ylim())
+
+    if dir == 'x':
+        yarr = yarr*0.0 + itcpt
+    elif dir == 'y':
+        xarr = xarr*0.0 + itcpt
+    else:
+        print 'I dont understand what direction ' + str(dir) + \
+              'is! Nothing plotted.'
+        return None
+
+    ax.plot(xarr,yarr,**kwargs)
+
+#======================================================
+
+def avg_movie():
+    print 'Not Coded Yet!'
+    #CR = p3d_run('local').load_movie('all')
+
+#======================================================
+
+def roll_run(CR,sx=None):
+    """ Roll every variable in a simulation (CR)
+        in the x direction by length in indexspace (sx)
+    """
+
+    if sx is None:
+        if CR['yy'][0] < 1.0: 
+            sx = -1*np.size(CR['xx'])/4
+        else: 
+            sx = np.size(CR['xx'])/4
+    
+    for key in CR.keys():
+        if key.rfind('av') == len(key)-2 and len(key) > 2:
+            print 'Rolling ',key
+            CR[key] = np.roll(CR[key],sx,axis=1)
+
+
+
 
