@@ -1,8 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.io.idl import readsav
+from scipy.io.idl import readsav 
 from matplotlib.ticker import AutoMinorLocator
 from p3d_runs import p3d_run
+import time
 
 #======================================================
 def set_local(IDL_restore,lcl):
@@ -209,8 +210,86 @@ def plot_line(itcpt,dir='y',ax=None,**kwargs):
 #======================================================
 
 def avg_movie():
-    print 'Not Coded Yet!'
-    #CR = p3d_run('local').load_movie('all')
+    
+    way = 'slow'
+
+    if way == 'fast':
+        CC = p3d_run('local')
+        print 'Loading time %i'%0
+        CR = CC.load_movie('all',0)
+
+        ntimes = CC.movie.num_of_times
+
+        keys = CR.keys()
+        keys.pop(keys.index('xx'))
+        keys.pop(keys.index('yy'))
+
+        t = time.time()
+        for k in keys:
+            _ = CC.load_movie(k,range(1,ntimes))
+            CR[k] += np.sum(_[k],axis=0) # sum along time
+            CR[k+'av'] = CR[k]/1.0/ntimes
+            CR[k] = _[k][-1,:,:]
+
+        print 'TOTAL TIME: %f'%(time.time() - t)
+
+    else:
+    ## First way I tried, maybe slow?
+        CC = p3d_run('local')
+        print 'Loading time %i'%0
+        CR = CC.load_movie('all',0)
+
+        ntimes = CC.movie.num_of_times
+
+        keys = CR.keys()
+        keys.pop(keys.index('xx'))
+        keys.pop(keys.index('yy'))
+
+        t = time.time()
+        for cosa in range(1,ntimes):
+            print '\n==================\n' \
+                    'Loading time %i' \
+                  '\n==================\n'%cosa
+            _ = CC.load_movie('all',cosa)
+            for k in keys:
+                CR[k] += _[k]
+                if cosa == ntimes -1:
+                    CR[k+'av'] = 1.0*CR[k]/ntimes
+                    CR[k] = _[k]
+
+        rotate_ten(CR,'pi')
+        rotate_ten(CR,'pe')
+        CR['tiparav'] = CR['piparav']/CR['niav']
+        CR['tiperp1av'] = CR['piperp1av']/CR['niav']
+        CR['tiperp2av'] = CR['piperp2av']/CR['niav']
+        CR['teparav'] = CR['peparav']/CR['neav']
+        CR['teperp1av'] = CR['peperp1av']/CR['neav']
+        CR['teperp2av'] = CR['peperp2av']/CR['neav']
+
+        print 'TOTAL TIME: %f'%(time.time() - t)
+
+        CRL = {}
+        CRU = {}
+        fname = raw_input('Enter Save file name base: ')
+        ylen = len(CR['yy'])
+        for k in CR:
+            if k != 'yy' and k != 'xx':
+                CRL[k] = np.squeeze(CR[k])[:ylen/2,:]
+                CRU[k] = np.squeeze(CR[k])[ylen/2:,:]
+            elif k == 'yy':
+                CRL[k] = CR[k][:ylen/2]
+                CRU[k] = CR[k][ylen/2:]
+            else:
+                CRL[k] = CR[k]
+                CRU[k] = CR[k]
+        
+        print 'Saving lower data...'
+        np.save(fname+'_lower',CRL)
+        print 'Saving upper data...'
+        np.save(fname+'_upper',CRU)
+
+    return CR
+
 
 #======================================================
 
@@ -230,6 +309,12 @@ def roll_run(CR,sx=None):
             print 'Rolling ',key
             CR[key] = np.roll(CR[key],sx,axis=1)
 
+#======================================================
 
+def readsave(restore_fname):
+    if restore_fname[restore_fname.rfind('.'):] == '.npy':
+        return np.load(restore_fname).all()
+    else:
+        return readsav(restore_fname)
 
 
