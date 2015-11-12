@@ -604,6 +604,10 @@ class p3d_dump(object):
                 v2 = (bxexb[0]*self.particles[species]['vx']+
                       bxexb[1]*self.particles[species]['vy']+
                       bxexb[2]*self.particles[species]['vz'])
+#Light Debuging
+                self.bbb = b_interp
+                self.exb = exb
+                self.beb = bxexb
                 #print 'Mucking this up!!!'
                 #Npart = 100000
                 #v0 = 1.*np.random.normal(scale=3.0,size=Npart)

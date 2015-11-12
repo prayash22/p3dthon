@@ -365,7 +365,11 @@ class p3d_run(object):
                     val = 'NO_ARG'
                 self.param_dict[key] = val
 
-    def load_movie(self,var='NOT_SET',time=-1,movie_num=None): #Colby add this, if there is any update to the p3d run reload the movie
+    def load_movie(self,
+                   var       ='NOT_SET',
+                   time      = None,
+                   movie_num = None): #Colby add this, if there is any update to the p3d run reload the movie
+
         """ Outer class wrapper for the inner class method load_movie
 
         Load movie files for a given set of varibles.

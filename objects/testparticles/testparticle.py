@@ -18,9 +18,13 @@ class TPRun:
     Test Particle run
     """
 
+    # This is called here so realpath is where the .so file is
+    _pathlibdir   = os.path.dirname(os.path.realpath(__file__))
+
     #==========================================================
     #==========================================================
     def __init__(self,
+                 CR,
                  npart=1,
                  charge=-1.,
                  mass=0.04,
@@ -38,6 +42,7 @@ class TPRun:
 
         """ constructor of the testparticle run object
 
+        @param CR          : The IDL restore file with all the data
         @param npart       : # of particles
         @param charge      : charge of the particles
         @param mass        : mass of the particles
@@ -65,6 +70,7 @@ class TPRun:
         Creation : 2013-05-01 11:17:42.987369
 
         """
+        self._CR        = CR
         self._npart     = npart
         self._charge    = charge
         self._mass      = mass
@@ -113,8 +119,8 @@ class TPRun:
         elif loading.lower() == 'randu_mag':
             self.load_randu_mag(r0,dr0,v0,dv0)
 
-        #c# elif loading.lower() == 'randn':
-        #c#     self.load_randn(r0,dr0,v0,dv0)
+        elif loading.lower() == 'randn':
+            self.load_randn(r0,dr0,v0,dv0)
 
         #c# elif loading.lower() == 'user':
         #c#     self._r0 = np.zeros((3,self._npart))
@@ -164,21 +170,21 @@ class TPRun:
         if self._fldinterp == False:
             #c# self._E = np.array([CR['exav'],CR['eyav'],CR['ezav']])
             #c# self._B = np.array([CR['bxav'],CR['byav'],CR['bzav']])
-            self._E = np.zeros((3,CR['bzav'].shape[1],CR['bzav'].shape[0]),"float32",order='FORTRAN')
-            self._B = np.zeros((3,CR['bzav'].shape[1],CR['bzav'].shape[0]),"float32",order='FORTRAN')
-            self._E[0,:,:] = CR['exav'].transpose()
-            self._E[1,:,:] = CR['eyav'].transpose()
-            self._E[2,:,:] = CR['ezav'].transpose()
-            self._B[0,:,:] = CR['bxav'].transpose()
-            self._B[1,:,:] = CR['byav'].transpose()
-            self._B[2,:,:] = CR['bzav'].transpose()
+            self._E = np.zeros((3,self._CR['bzav'].shape[1],self._CR['bzav'].shape[0]),"float32",order='FORTRAN')
+            self._B = np.zeros((3,self._CR['bzav'].shape[1],self._CR['bzav'].shape[0]),"float32",order='FORTRAN')
+            self._E[0,:,:] = self._CR['exav'].transpose()
+            self._E[1,:,:] = self._CR['eyav'].transpose()
+            self._E[2,:,:] = self._CR['ezav'].transpose()
+            self._B[0,:,:] = self._CR['bxav'].transpose()
+            self._B[1,:,:] = self._CR['byav'].transpose()
+            self._B[2,:,:] = self._CR['bzav'].transpose()
             #c# self._E = np.array([transpose(CR['exav']),transpose(CR['eyav']),transpose(CR['ezav'])])
             #c# self._B = np.array([transpose(CR['bxav']),transpose(CR['byav']),transpose(CR['bzav'])])
 
             # smooth fields may help... B is fine, E is noisy !!
             for c in range(3):
                 self._E[c,:,:] = ndimage.gaussian_filter(self._E[c,:,:],
-                                                         sigma=2, #used to be 6
+                                                         sigma=6, #used to be 6
                                                          order=0)
 
             # checks which component is the out of plane
@@ -208,8 +214,7 @@ class TPRun:
 
 
         # linking to the C library
-        pathlibdir   = os.path.dirname(os.path.realpath(__file__))
-        pathlib      = os.path.join(pathlibdir,'functions.so')
+        pathlib   = os.path.join(self._pathlibdir,'functions.so')
         self._lib = ctypes.cdll.LoadLibrary(pathlib)
     #==========================================================
 
@@ -284,10 +289,10 @@ class TPRun:
         #c# xc = self._run.GetCoord(axis=0)
         #c# yc = self._run.GetCoord(axis=1)
 
-        xc = CR['xx'][0]
-        yc = CR['yy'][0]
-        self._dx = CR['xx'][1] - CR['xx'][0]
-        self._dy = CR['yy'][1] - CR['yy'][0]
+        xc = self._CR['xx'][0]
+        yc = self._CR['yy'][0]
+        self._dx = self._CR['xx'][1] - self._CR['xx'][0]
+        self._dy = self._CR['yy'][1] - self._CR['yy'][0]
 
         func(self.r,
              self.v,
@@ -336,10 +341,10 @@ class TPRun:
                          ndpointer(ctypes.c_double)]    # Bp
 
 
-        self._dx = CR['xx'][1] - CR['xx'][0]
-        self._dy = CR['yy'][1] - CR['yy'][0]
-        xc = CR['xx'][0]-self._dx/2.
-        yc = CR['yy'][0]-self._dy/2.
+        self._dx = self._CR['xx'][1] - self._CR['xx'][0]
+        self._dy = self._CR['yy'][1] - self._CR['yy'][0]
+        xc = self._CR['xx'][0]-self._dx/2.
+        yc = self._CR['yy'][0]-self._dy/2.
 
         print 
 
@@ -379,8 +384,31 @@ class TPRun:
             v1 = v_i - dv_i/2.
             v2 = v_i + dv_i/2.
 
+
             self._v0[c,:] = np.random.random(self._npart)
             self._v0[c,:] = self._v0[c,:] * (v2 - v1) + v1
+            c += 1
+
+    #==========================================================
+    #==========================================================
+    def _velinitn(self, v, dv):
+        """uniform random velocities
+
+        Creation : 2015-10-09 17:12:42.773824
+
+        """
+
+        # create the array
+        self._v0 = np.zeros((3, self._npart))
+
+        # x, y, z components of the velocity
+        c = 0
+
+        # loop over vx0, vy0, vz0
+        for v_i,dv_i in zip(v,dv):
+
+            self._v0[c,:] = np.random.randn(self._npart)*dv_i
+            self._v0[c,:] = self._v0[c,:] + v_i
             c += 1
 
     #==========================================================
@@ -454,7 +482,8 @@ class TPRun:
 
             c += 1
 
-        self._velinit(v,dv)
+        #self._velinit(v,dv)
+        self._velinitn(v,dv)
 
     #==========================================================
 
