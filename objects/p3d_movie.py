@@ -207,7 +207,7 @@ class p3d_movie(object):
 
                     _ = chose + 1
 
-            return_dict[cosa] = byte_arr
+            return_dict[cosa] = np.squeeze(byte_arr)
 
         return_dict.update(zip(('xx','yy'), self.get_domain_arrays()))
         return return_dict
