@@ -12,10 +12,17 @@ def set_fig():
 
 #==============================================
 
-def close_fig(pdf):
-    plt.tight_layout()
-    pdf.savefig()  # saves the current figure into a pdf page
-    plt.close()
+def close_fig(pdf,nosave=False):
+    if nosave:
+        plt.show()
+        plt.draw()
+        #plt.tight_layout()
+        raw_input('nosave flag set. Return to see next figure: ')
+        plt.clf()
+    else:
+        #plt.tight_layout()
+        pdf.savefig()  # saves the current figure into a pdf page
+        plt.close()
 
 #==============================================
 
@@ -127,6 +134,11 @@ def plot_1D(ax,CR,var,
 
     ax.autoscale(False)
 
+    vcuts = locate_seps(CR,ip)
+
+    for offset in vcuts:
+        draw_line(ax,cut='y',offset=offset)
+
     plt.sca(ax)
     plt.minorticks_on()
 
@@ -222,9 +234,27 @@ def cut_n_cont_locs(CR):
     lx = CR['xx'][-1] + CR['xx'][0] 
     ly = CR['yy'][-1] + CR['yy'][1] - 2.*CR['yy'][0]
 
-    ncuts = int(np.log(lx/2./2.5)/np.log(2.)) # We will have a cut a 2.5 and 
-                                        # then double the lenght each time
-    cut_locs = [2.5*2.**abs(n) for n in range(ncuts+1)]
+# We will have a cut a 2.5 and 
+# then double the lenght each time
+# But this has now been replaced with
+# the while loop for a better spread
+# of cuts
+    #ncuts = int(np.log(lx/2./2.5)/np.log(2.)) 
+    #cut_locs = [2.5*2.**abs(n) for n in range(ncuts+1)]
+    
+    _dx = 5.0
+    _ct = 0 
+    _mx = 2
+    cut_locs = [0.0]
+    while cut_locs[-1] < lx/2.0:
+        cut_locs += [(cut_locs[-1] + _dx)]
+        _ct += 1
+        if _ct >= _mx:
+            _ct = 0
+            _mx += 2
+            _dx *= 2.
+
+    cut_locs[-1] = lx/2.0
     cut_locs = [-1.0*x for x in cut_locs[::-1]] + \
                [0.] + cut_locs + [lx/2.]
 
@@ -238,3 +268,33 @@ def cut_n_cont_locs(CR):
     return cut_locs,psi_lvls
 
 
+def locate_seps(CR,ip):
+    """ This Function take
+        CR: a standered simulation and
+        ip: the x index for the y cut location
+
+        and returns
+
+        ypl: the real location of the left 
+             speratrix
+        ypm: the real location of the 
+             midplane
+        ypr: the real location of the right 
+             speratrix
+     """
+# Frist we need to find the xline
+    jpx = np.shape(CR['psi'])[0]/2
+    if CR['yy'][0] < 1.0:                 # If lower half
+        ipx = CR['psi'][jpx,:].argmin()
+    else:                           # Else upper half
+        ipx = CR['psi'][jpx,:].argmax()
+    
+    psi0 = CR['psi'][jpx,ipx]
+    ypl = abs(CR['psi'][:jpx,ip] - psi0).argmin()
+    ypr = abs(CR['psi'][jpx:,ip] - psi0).argmin()
+
+    ypl = CR['yy'][ypl]
+    ypm = CR['yy'][jpx]
+    ypr = CR['yy'][jpx + ypr]
+
+    return [ypl,ypm,ypr]
