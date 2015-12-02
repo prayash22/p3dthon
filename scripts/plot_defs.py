@@ -92,7 +92,6 @@ def plot_2D(ax,CR,var,
 def plot_1D(ax,CR,var,
             dir='y',
             loc=0.,
-            label=None,
             extent=None,
             **kwargs):
 
@@ -105,11 +104,8 @@ def plot_1D(ax,CR,var,
         
         if type(var) in [dict,OrderedDict]:
             ln = []
-            for c,key in enumerate(var):
-                if label is not None:
-                    lab = label[c]
-                else:
-                    lab ='$'+key+'$'
+            for key in var:
+                lab ='$'+key+'$'
                 ln.append(\
                 ax.plot(CR['yy'],
                         var[key][:,ip],
