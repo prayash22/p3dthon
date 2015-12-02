@@ -213,6 +213,8 @@ def avg_movie():
     
     way = 'slow'
 
+    fname = raw_input('Enter Save file name base: ')
+
     if way == 'fast':
         CC = p3d_run('local')
         print 'Loading time %i'%0
@@ -270,7 +272,6 @@ def avg_movie():
 
         CRL = {}
         CRU = {}
-        fname = raw_input('Enter Save file name base: ')
         ylen = len(CR['yy'])
         for k in CR:
             if k != 'yy' and k != 'xx':

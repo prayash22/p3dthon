@@ -1,10 +1,12 @@
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 from sub import *
 
 #==============================================
 
 def set_fig():
+    mpl.rcParams.update({'figure.autolayout': True})
     fig = plt.figure(1,figsize=(8.5, 11.))
     fig.clf()
     axs = [fig.add_subplot(6,2,x+1) for x in range(12)]

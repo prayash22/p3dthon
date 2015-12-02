@@ -5,11 +5,10 @@ from sub import calc_psi
 
 # Assume Movie Dat has been loaded
 # and is called CR
-CR = load('./reconn922_U.npz')['CR'].all()
-matplotlib.rcParams.update({'figure.autolayout': True})
 
 # Calc extra variables
 def make_pat_plot(CR,fname=None):
+
     _CR = dict(CR)
     for k in _CR.keys():
         if len(k) > 2 and k.rfind('av') > 0: 
