@@ -1,5 +1,6 @@
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import matplotlib.pyplot as plt
+from collections import OrderedDict
 from sub import *
 
 #==============================================
@@ -78,7 +79,7 @@ def plot_2D(ax,CR,var,
                         colors='k',
                         linewidths=.5)
 
-        for c in cs.collections: c.set_linestyle('solid')
+        [c.set_linestyle('solid') for c in cs.collections]
 
     if cut_locs is not None:
         for cosa in cut_locs:
@@ -91,36 +92,48 @@ def plot_2D(ax,CR,var,
 def plot_1D(ax,CR,var,
             dir='y',
             loc=0.,
+            label=None,
             extent=None,
             **kwargs):
 
+    lgargs = kwargs.pop('lgargs',None)
+    no_lines = kwargs.pop('no_lines',False)
     c_itter = ['r','b','g','k']
     if dir == 'y':
 
         ip = abs(CR['xx'] - loc).argmin()
-
-        if type(var) is dict:
-            for key in var:
+        
+        if type(var) in [dict,OrderedDict]:
+            ln = []
+            for c,key in enumerate(var):
+                if label is not None:
+                    lab = label[c]
+                else:
+                    lab ='$'+key+'$'
+                ln.append(\
                 ax.plot(CR['yy'],
                         var[key][:,ip],
                         color=c_itter.pop(0),
-                        label=r'$'+key+'$',
-                        **kwargs)
+                        label=r'%s'%lab,
+                        **kwargs)[0])
 
             ax.set_xlabel(r'$Y (d_i)$',fontsize=8)
 
-            ax.legend(bbox_to_anchor=(0., 1.02, 1., .102), 
-                      loc=3,
-                      ncol=len(var),
-                      borderaxespad=0.,
-                      prop={'size':6})
+            if lgargs is not None:
+                lg = ax.legend(**lgargs)
+            else:
+                lg = ax.legend(bbox_to_anchor=(0., 1.02, 1., .102), 
+                               loc=3,
+                               ncol=len(var),
+                               borderaxespad=0.,
+                               prop={'size':6})
 
         else:
-            ax.plot(CR['yy'],var[:,ip],**kwargs)
+            ln = ax.plot(CR['yy'],var[:,ip],**kwargs)
 
     if extent is not None:
         ax.set_xlim(extent[:2])
-        if size(extent) > 2:
+        if np.size(extent) > 2:
             ax.set_ylim(extent[2:])
     else:
         if dir == 'y':
@@ -135,12 +148,19 @@ def plot_1D(ax,CR,var,
     ax.autoscale(False)
 
     vcuts = locate_seps(CR,ip)
-
-    for offset in vcuts:
-        draw_line(ax,cut='y',offset=offset)
+    
+    if not no_lines:
+        for offset in vcuts:
+            draw_line(ax,cut='y',offset=offset)
+    else:
+        draw_line(ax,cut='x',offset=0.)
+        draw_line(ax,cut='y',offset=0.)
 
     plt.sca(ax)
     plt.minorticks_on()
+
+    return ln,lg
+ 
 
 #==============================================
 
