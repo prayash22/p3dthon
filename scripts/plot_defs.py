@@ -1,10 +1,13 @@
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+import matplotlib as mpl
 import matplotlib.pyplot as plt
+from collections import OrderedDict
 from sub import *
 
 #==============================================
 
 def set_fig():
+    mpl.rcParams.update({'figure.autolayout': True})
     fig = plt.figure(1,figsize=(8.5, 11.))
     fig.clf()
     axs = [fig.add_subplot(6,2,x+1) for x in range(12)]
@@ -12,10 +15,17 @@ def set_fig():
 
 #==============================================
 
-def close_fig(pdf):
-    plt.tight_layout()
-    pdf.savefig()  # saves the current figure into a pdf page
-    plt.close()
+def close_fig(pdf,nosave=False):
+    if nosave:
+        plt.show()
+        plt.draw()
+        #plt.tight_layout()
+        raw_input('nosave flag set. Return to see next figure: ')
+        plt.clf()
+    else:
+        #plt.tight_layout()
+        pdf.savefig()  # saves the current figure into a pdf page
+        plt.close()
 
 #==============================================
 
@@ -71,7 +81,7 @@ def plot_2D(ax,CR,var,
                         colors='k',
                         linewidths=.5)
 
-        for c in cs.collections: c.set_linestyle('solid')
+        [c.set_linestyle('solid') for c in cs.collections]
 
     if cut_locs is not None:
         for cosa in cut_locs:
@@ -87,33 +97,41 @@ def plot_1D(ax,CR,var,
             extent=None,
             **kwargs):
 
+    lgargs = kwargs.pop('lgargs',None)
+    no_lines = kwargs.pop('no_lines',False)
     c_itter = ['r','b','g','k']
     if dir == 'y':
 
         ip = abs(CR['xx'] - loc).argmin()
-
-        if type(var) is dict:
+        
+        if type(var) in [dict,OrderedDict]:
+            ln = []
             for key in var:
+                lab ='$'+key+'$'
+                ln.append(\
                 ax.plot(CR['yy'],
                         var[key][:,ip],
                         color=c_itter.pop(0),
-                        label=r'$'+key+'$',
-                        **kwargs)
+                        label=r'%s'%lab,
+                        **kwargs)[0])
 
             ax.set_xlabel(r'$Y (d_i)$',fontsize=8)
 
-            ax.legend(bbox_to_anchor=(0., 1.02, 1., .102), 
-                      loc=3,
-                      ncol=len(var),
-                      borderaxespad=0.,
-                      prop={'size':6})
+            if lgargs is not None:
+                lg = ax.legend(**lgargs)
+            else:
+                lg = ax.legend(bbox_to_anchor=(0., 1.02, 1., .102), 
+                               loc=3,
+                               ncol=len(var),
+                               borderaxespad=0.,
+                               prop={'size':6})
 
         else:
-            ax.plot(CR['yy'],var[:,ip],**kwargs)
+            ln = ax.plot(CR['yy'],var[:,ip],**kwargs)
 
     if extent is not None:
         ax.set_xlim(extent[:2])
-        if size(extent) > 2:
+        if np.size(extent) > 2:
             ax.set_ylim(extent[2:])
     else:
         if dir == 'y':
@@ -127,8 +145,20 @@ def plot_1D(ax,CR,var,
 
     ax.autoscale(False)
 
+    vcuts = locate_seps(CR,ip)
+    
+    if not no_lines:
+        for offset in vcuts:
+            draw_line(ax,cut='y',offset=offset)
+    else:
+        draw_line(ax,cut='x',offset=0.)
+        draw_line(ax,cut='y',offset=0.)
+
     plt.sca(ax)
     plt.minorticks_on()
+
+    return ln,lg
+ 
 
 #==============================================
 
@@ -222,9 +252,27 @@ def cut_n_cont_locs(CR):
     lx = CR['xx'][-1] + CR['xx'][0] 
     ly = CR['yy'][-1] + CR['yy'][1] - 2.*CR['yy'][0]
 
-    ncuts = int(np.log(lx/2./2.5)/np.log(2.)) # We will have a cut a 2.5 and 
-                                        # then double the lenght each time
-    cut_locs = [2.5*2.**abs(n) for n in range(ncuts+1)]
+# We will have a cut a 2.5 and 
+# then double the lenght each time
+# But this has now been replaced with
+# the while loop for a better spread
+# of cuts
+    #ncuts = int(np.log(lx/2./2.5)/np.log(2.)) 
+    #cut_locs = [2.5*2.**abs(n) for n in range(ncuts+1)]
+    
+    _dx = 5.0
+    _ct = 0 
+    _mx = 2
+    cut_locs = [0.0]
+    while cut_locs[-1] < lx/2.0:
+        cut_locs += [(cut_locs[-1] + _dx)]
+        _ct += 1
+        if _ct >= _mx:
+            _ct = 0
+            _mx += 2
+            _dx *= 2.
+
+    cut_locs[-1] = lx/2.0
     cut_locs = [-1.0*x for x in cut_locs[::-1]] + \
                [0.] + cut_locs + [lx/2.]
 
@@ -238,3 +286,33 @@ def cut_n_cont_locs(CR):
     return cut_locs,psi_lvls
 
 
+def locate_seps(CR,ip):
+    """ This Function take
+        CR: a standered simulation and
+        ip: the x index for the y cut location
+
+        and returns
+
+        ypl: the real location of the left 
+             speratrix
+        ypm: the real location of the 
+             midplane
+        ypr: the real location of the right 
+             speratrix
+     """
+# Frist we need to find the xline
+    jpx = np.shape(CR['psi'])[0]/2
+    if CR['yy'][0] < 1.0:                 # If lower half
+        ipx = CR['psi'][jpx,:].argmin()
+    else:                           # Else upper half
+        ipx = CR['psi'][jpx,:].argmax()
+    
+    psi0 = CR['psi'][jpx,ipx]
+    ypl = abs(CR['psi'][:jpx,ip] - psi0).argmin()
+    ypr = abs(CR['psi'][jpx:,ip] - psi0).argmin()
+
+    ypl = CR['yy'][ypl]
+    ypm = CR['yy'][jpx]
+    ypr = CR['yy'][jpx + ypr]
+
+    return [ypl,ypm,ypr]

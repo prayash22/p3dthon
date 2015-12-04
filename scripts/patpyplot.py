@@ -5,10 +5,10 @@ from sub import calc_psi
 
 # Assume Movie Dat has been loaded
 # and is called CR
-#CR = load('./reconn922_U.npz')['CR'].all()
 
 # Calc extra variables
 def make_pat_plot(CR,fname=None):
+
     _CR = dict(CR)
     for k in _CR.keys():
         if len(k) > 2 and k.rfind('av') > 0: 
@@ -59,18 +59,20 @@ def make_pat_plot(CR,fname=None):
                     'gist_heat','gist_heat',
                     'gist_heat','gist_heat'])
 # Page #4
-    vars_2D.append(['vipar','vepar',
-                    'viperp','veperp',
+#    vars_2D.append(['vipar','vepar', # This was the old set up
+#                    'viperp','veperp',
+    vars_2D.append(['tipar','tepar',
+                    'tiperp1','teperp1',
+                    'viperp','vepar',
                     'exbx','exby',
                     'exbz','|exb|',
-                    'epar', 'jpar',
-                    'phin', 'phit'])
-    pg_cmap.append(['bwr','bwr',
+                    'epar', 'jpar'])
+    pg_cmap.append(['gist_heat','gist_heat',
+                    'gist_heat','gist_heat',
                     'bwr','bwr',
                     'bwr','bwr',
                     'bwr','gist_heat',
-                    'bwr','bwr',
-                    'gist_heat','gist_heat'])
+                    'bwr','bwr'])
 
 # This is bascily the dict that that coresponds to each location 
 # of the 1D cuts
@@ -103,7 +105,6 @@ def make_pat_plot(CR,fname=None):
                         cut_locs=cut_locs)
 
             close_fig(pdf)
-            #sys.exit()
 
 # Now 1D plots
         for loc in cut_locs:

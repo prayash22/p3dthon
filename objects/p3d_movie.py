@@ -178,12 +178,14 @@ class p3d_movie(object):
 # and the doulbe byte is signed so that is why
 # one has a uint and the other is just int
             if 'double_byte' in self.param_dict:
-                dat_type = np.dtype('uint16')
+                dat_type = np.dtype('int16')
                 norm_cst = 256**2-1
+                shft_cst = 1.0*256**2/2
             else: #single byte precision
                 #dat_type = 'int8'
                 dat_type = np.dtype('uint8')
                 norm_cst = 256-1
+                shft_cst = 0.0 
 
             
             _ = 0 # This keeps track of where we are
@@ -201,9 +203,9 @@ class p3d_movie(object):
                                                   count=grid_pts
                                                   ).reshape(ney,nex)
     
-                    byte_arr[i,:,:] = 1.0*byte_arr[i,:,:]* \
+                    byte_arr[i,:,:] = (1.0*byte_arr[i,:,:] + shft_cst)* \
                                       (lmax[chose]-lmin[chose]) \
-                                      /norm_cst + 1.0*lmin[chose]
+                                      /(1.0*norm_cst) + lmin[chose]
 
                     _ = chose + 1
 

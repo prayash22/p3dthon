@@ -1,18 +1,13 @@
-########################################################################################################################################################
-########################################################################################################################################################
-#                                                                                                                                                      #
-#                                                 Python Progs :  p3d_dump.py                                                                         #
-#                                                 Aruthor      :  Colby Haggerty                                                                       #
-#                                                 Date         :  2014.08.15                                                                           #
-#                                                                                                                                                      #
-#                                                                                                                                                      #
-########################################################################################################################################################
+#######################################################################
+#######################################################################
+#                                                                     #
+#                  Python Progs :  p3d_dump.py                        #
+#                  Aruthor      :  Colby Haggerty                     #
+#                  Date         :  2014.08.15                         #
+#                                                                     #
+#                                                                     #
+#######################################################################
 ### Discription:
-#
-#       p3d_movie class is a movie object to be handled by p3d_run. This object keeps all of the information for a  
-#       given movie. We have seperated this from the p3d_object to keep things neatter and cleaner. The plan is then
-#       apply this same idea to the dump files. NOTE there may be a time trade off issue between this and doing every
-#       thing together, but i dont think that will be an issue.
 #
 
 import os
@@ -24,7 +19,14 @@ import glob
 from scipy.io.idl import readsav
 
 class p3d_dump(object):
-    """p3d_run object """
+    """p3d_run object 
+
+        p3d_movie class is a movie object to be handled by p3d_run. This object
+        keeps all of the information for a  given movie. We have seperated this from the
+        p3d_object to keep things neatter and cleaner. The plan is then apply this same
+        idea to the dump files. NOTE there may be a time trade off issue between this
+        and doing every thing together, but i dont think that will be an issue.  #
+    """
 
     def __init__(self, dump_path, param_dict, dump_num=-1): 
         """ Initilazition Routine for the p3d_run object
@@ -240,30 +242,52 @@ class p3d_dump(object):
         movie_num_int = raw_input()
         return int(movie_num_int)
 
-    def vdist_2d(self,r0=[0.5,0.5],dx=[1.0,1.0],par=False,Bvec=False,pitch=False,pizza=False,OneD=False,**kwargs):
-        """Generates differnent 2-Dimensional histograms for particles 
+    def vdist_2d(self,
+                 r0=[0.5,0.5],
+                 dx=[1.0,1.0],
+                 par=False,
+                 Bvec=False,
+                 pitch=False,
+                 pizza=False,
+                 OneD=False,
+                 **kwargs):
+
+        """ Generates differnent 2-Dimensional histograms for particles 
+            Please god colby add a doc string!!!
         """
+
+        self._par   = par
+        self._pizza = pizza
+        self._Bvec  = Bvec
+
+        if isinstance(dx,float):
+            dx = [dx,dx] # Square box. Does this change dx?
+
 # Turn this into a method
 #%%%%%%%%%%%%%%%
         if OneD: # Make dy = ly
             r0[1] = self.param_dict['ly']/2.0
             dx = [dx[0], self.param_dict['ly']/2.0]
         if not hasattr(self,'_r0') or not hasattr(self,'particles'):
-            self._r0 = r0
-            self._dx = dx
+            self._r0 = r0[:]
+            self._dx = dx[:]
 # Calling get particles in box to make the vdist
             #qc#print 'Reading Ions and Electrons from the Dump File'
             self.particles = self._part_in_box(r0,dx)
         else:
-            if (self._r0[0] == r0[0]) and (self._r0[1] == r0[1]) and (self._dx == dx):
-                print '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
-                print '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Same r0 and dx found, using old particles ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
-                print 'r0 = '+str(r0)+' _r0 = '+str(self._r0)
-                print '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
-                print '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
+            if (self._r0[0] == r0[0]) and \
+               (self._r0[1] == r0[1]) and \
+               (self._dx[0] == dx[0]) and \
+               (self._dx[1] == dx[1]):
+
+                print '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
+                print '~~~ Same r0 and dx found, using old particles ~~~'
+                print '~~~ r0 = '+str(r0)+' _r0 = '+str(self._r0)  
+                print '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
+
             else:
-                self._r0 = r0
-                self._dx = dx
+                self._r0 = r0[:]
+                self._dx = dx[:]
                 #qc#print 'Reading Ions and Electrons from the Dump File'
                 self.particles = self._part_in_box(r0,dx)
 #%%%%%%%%%%%%%%%
@@ -288,13 +312,25 @@ class p3d_dump(object):
             else:
                 return_hist = self._vdist_2d(**kwargs)
                 #qc#print 'Interpolating the Bfield at the given r0 value'
-                return_hist['B'] = np.array([self.interp_field(self.dump_field_dict['bx']), \
-                                             self.interp_field(self.dump_field_dict['by']), \
-                                             self.interp_field(self.dump_field_dict['bz'])])
+                return_hist['B'] = np.array([
+                   self.interp_field(self.dump_field_dict['bx']),
+                   self.interp_field(self.dump_field_dict['by']), 
+                   self.interp_field(self.dump_field_dict['bz'])])
         else:
             return_hist = self._vdist_2d(**kwargs)
 
+        self._box = [self._r0[0]-self._dx[0]/2.,
+                     self._r0[0]+self._dx[0]/2.,
+                     self._r0[1]-self._dx[1]/2.,
+                     self._r0[1]+self._dx[1]/2.]
+
+        return_hist['box'] = self._box
+
         return return_hist
+
+
+
+
 
 #wut?    def _vdist_pitch(self,**kwargs):
 #wut?        bx_interp = self.interp_field(self.dump_field_dict['bx'],self.param_dict['lx'],self.param_dict['ly'],self._r0)
@@ -359,7 +395,7 @@ class p3d_dump(object):
 #wut?        return return_hist_dict
 
 
-    def _vdist_pitch(self,par=False,**kwargs): 
+    def _vdist_pitch(self,par=False,energy=False,**kwargs): 
 # I have a lot of code that can return a 2D distrubution function for a givn pitch angle range
 # but I don't think that this will ever be usefull... I should remove it
         if not kwargs.has_key('pa'): pa = 90. #pa = pitch_angle, but I am lazy
@@ -367,8 +403,6 @@ class p3d_dump(object):
         if not kwargs.has_key('dpa'): dpa = 5.
         else: dpa = kwargs.pop('dpa') 
 
-        if kwargs.has_key('energy'): energy = kwargs.pop('energy')
-        else: energy = False
         if not kwargs.has_key('pa'): pa = 90. #pa = pitch_angle, but I am lazy
         else: pa = kwargs.pop('pa') 
         if not kwargs.has_key('wax'): wax = 0 #pa = which_axsis, but I am lazy
@@ -395,9 +429,9 @@ class p3d_dump(object):
             b_interp = b_interp/np.sqrt(sum(b_interp**2))
 
             bxexb = np.cross(b_interp,exb) 
-            print b_interp
-            print exb
-            print bxexb
+            #print b_interp
+            #print exb
+            #print bxexb
 
         velo={}
         return_hist_dict = {}
@@ -407,7 +441,7 @@ class p3d_dump(object):
         #self.particles['e']['vx'] = 1.*np.random.normal(scale=2.5,size=Npart)
         #self.particles['e']['vy'] = 1.*np.random.normal(scale=2.5,size=Npart)
         #self.particles['e']['vz'] = 1.*np.random.normal(scale=2.5,size=Npart)
-        ##print 'Done Mucking this up!!!'
+        #print 'Done Mucking this up!!!'
         for species in self.species:
        
             if par:
@@ -423,10 +457,10 @@ class p3d_dump(object):
                       bxexb[1]*self.particles[species]['vy']+
                       bxexb[2]*self.particles[species]['vz'])
                 #print 'Mucking this up!!!'
-                #Npart = 100000
-                #v0 = 1.*np.random.normal(scale=3.0,size=Npart)
-                #v1 = 1.*np.random.normal(scale=1.0,size=Npart)
-                #v2 = 1.*np.random.normal(scale=1.0,size=Npart)
+                #Npart = 1000000
+                #v0 = 1.*np.random.normal(scale=5.0,size=Npart)
+                #v1 = 1.*np.random.normal(scale=5.0,size=Npart)
+                #v2 = 1.*np.random.normal(scale=5.0,size=Npart)
             else:
                 v0 = self.particles[species]['vx']
                 v1 = self.particles[species]['vy']
@@ -474,14 +508,15 @@ class p3d_dump(object):
 #This is silly just do the whole distro right here
             if energy:
                 if species == 'e':
-                    KE = self.param_dict['m_e']/2.0*(self.particles[species]['vx']**2+
-                                                     self.particles[species]['vy']**2+
-                                                     self.particles[species]['vz']**2)
+                    KE = self.param_dict['m_e']/2.0*\
+                        (self.particles[species]['vx']**2+
+                         self.particles[species]['vy']**2+
+                         self.particles[species]['vz']**2)
                     #print 'More Mucking!!!'
                     #KE = self.param_dict['m_e']/2.0*(v0**2+
                     #                                 v1**2+
                     #                                 v2**2)
-
+                    #
                 else:
                     KE = 1.0/2.0*(self.particles[species]['vx']**2+
                                   self.particles[species]['vy']**2+
@@ -507,8 +542,13 @@ class p3d_dump(object):
                     self.eng = eng
                     self.H = H
                     self.yyy = yy
-                return_hist_dict[species].append(H/ynorm*eng**2)
-                #return_hist_dict[species].append(H/ynorm)
+
+# We need to account for a geometric factor because
+# E is basicly v^2, so we are binning circles?
+                H = H/np.sqrt(eng)
+
+                return_hist_dict[species].append(H/ynorm*eng**2.*np.size(pitch_angle))
+
                 return_hist_dict[species].append(xedges)
                 return_hist_dict[species].append(yedges)
 
@@ -546,24 +586,46 @@ class p3d_dump(object):
 
         return return_hist_dict
 
-    def _vdist_pizza(self,par=False,**kwargs): 
-# I have a lot of code that can return a 2D distrubution function for a givn pitch angle range
-# but I don't think that this will ever be usefull... I should remove it
-        if not kwargs.has_key('z0'): z0 = 0. #pa = pitch_angle, but I am lazy
-        else: z0 = kwargs.pop('z0') 
-        if not kwargs.has_key('dz'): dz = 1.
-        else: dz = kwargs.pop('dz') 
-        if not kwargs.has_key('wax'): wax = 0 
-        else: wax = kwargs.pop('wax') 
+    def _vdist_pizza(self,par=False,z0=0.,dz=1.,wax=0,**kwargs): 
+        """ Pizza Party!!!
+            
+            Also I am sooo sory if you ever have to
+            use this code in this version... :(
+
+            A little help:
+            wax = which axis do we integarte over?
+            wax = (0,1,2) -> (x,y,z) 
+                or if in field line coordinates
+            wax = (0,1,2) -> (||, ExB, bxExB)
+
+        """
+
+        self._z0  = z0
+        self._dz  = dz
+        self._wax = wax
 
         if par:
-            b_interp = np.array([ self.interp_field(self.dump_field_dict['bx'],self.param_dict['lx'],self.param_dict['ly'],self._r0),
-                                  self.interp_field(self.dump_field_dict['by'],self.param_dict['lx'],self.param_dict['ly'],self._r0),
-                                  self.interp_field(self.dump_field_dict['bz'],self.param_dict['lx'],self.param_dict['ly'],self._r0)])
+            b_interp = np.array([ 
+                       self.interp_field(self.dump_field_dict['bx'],
+                                         self.param_dict['lx'],
+                                         self.param_dict['ly'],self._r0),
+                       self.interp_field(self.dump_field_dict['by'],
+                                         self.param_dict['lx'],
+                                         self.param_dict['ly'],self._r0),
+                       self.interp_field(self.dump_field_dict['bz'],
+                                         self.param_dict['lx'],
+                                         self.param_dict['ly'],self._r0)])
 
-            e_interp = np.array([ self.interp_field(self.dump_field_dict['ex'],self.param_dict['lx'],self.param_dict['ly'],self._r0),
-                                  self.interp_field(self.dump_field_dict['ey'],self.param_dict['lx'],self.param_dict['ly'],self._r0),
-                                  self.interp_field(self.dump_field_dict['ez'],self.param_dict['lx'],self.param_dict['ly'],self._r0)])
+            e_interp = np.array([ 
+                       self.interp_field(self.dump_field_dict['ex'],
+                                         self.param_dict['lx'],
+                                         self.param_dict['ly'],self._r0),
+                       self.interp_field(self.dump_field_dict['ey'],
+                                         self.param_dict['lx'],
+                                         self.param_dict['ly'],self._r0),
+                       self.interp_field(self.dump_field_dict['ez'],
+                                         self.param_dict['lx'],
+                                         self.param_dict['ly'],self._r0)])
 
             exb = np.cross(e_interp,b_interp)/sum(b_interp**2)
             exb = exb/np.sqrt(sum(exb**2))
@@ -571,9 +633,9 @@ class p3d_dump(object):
             b_interp = b_interp/np.sqrt(sum(b_interp**2))
 
             bxexb = np.cross(b_interp,exb) 
-            print b_interp
-            print exb
-            print bxexb
+            #print b_interp
+            #print exb
+            #print bxexb
 
         velo={}
         return_hist_dict = {}
@@ -593,14 +655,21 @@ class p3d_dump(object):
             return_hist_dict[species] = []
        
             if par:
+# MuckMuckMuckMuck!!!!!
+#                vxxx = self.particles[species]['vx'] + 1.0
+# MuckMuckMuckMuck!!!!!
+
+                #v0 = (b_interp[0]*vxxx+
                 v0 = (b_interp[0]*self.particles[species]['vx']+
                       b_interp[1]*self.particles[species]['vy']+
                       b_interp[2]*self.particles[species]['vz'])
 
+                #v1 = (exb[0]*vxxx+
                 v1 = (exb[0]*self.particles[species]['vx']+
                       exb[1]*self.particles[species]['vy']+
                       exb[2]*self.particles[species]['vz'])
 
+                #v2 = (bxexb[0]*vxxx+
                 v2 = (bxexb[0]*self.particles[species]['vx']+
                       bxexb[1]*self.particles[species]['vy']+
                       bxexb[2]*self.particles[species]['vz'])
@@ -622,10 +691,10 @@ class p3d_dump(object):
                 vp0 = v1
                 vp1 = v2
                 vax = v0
-            elif wax == 1:
-                vp0 = v0
-                vp1 = v1
-                vax = v2
+            elif wax == 1: 
+                vp0 = v2
+                vp1 = v0
+                vax = v1
             elif wax == 2:
                 vp0 = v0
                 vp1 = v1
@@ -868,19 +937,27 @@ class p3d_dump(object):
     #def get_part_in_box([location, width]):
     def _part_in_box(self,r0=[0.5,0.5],dx=[1.,1.]):
         """
-        #---------------------------------------------------------------------------------------------------------------
+        #--------------------------------------------------------------
         #   Method      : get_part_in_box
         #
-        #   Discription : This method accepts a point and a width in simulation units (c/wpi) to define a box.
-        #               : In that box we bin all of the particles to form the effective distrobution function
+        #   Discription : This method accepts a point and a width in 
+        #                 simulation units (c/wpi) to define a box.
+        #               : In that box we bin all of the particles to 
+                          form the effective distrobution function
         #
-        #   Args        : location [x,y] ( where you want the center of you box to be located at)
-        #               : width [x,y] (the width of the box to bin particles 
-        #               : dump_num (This spesifies the particular runs dump file 
+        #   Args     r0 : location [x,y] ( where you want the center 
+                          of you box to be located at)
+        #            dx : width [x,y] (the width of the box to bin 
+                           particles 
+        #               : dump_num (This spesifies the particular 
+                          runs dump file 
         #
-        #   Comments    : It would be pretty easy and potential usefull to allow this to wrap around the edges
-        #               : so we can pick zero as a boundry and the code will know what todo.
-        #---------------------------------------------------------------------------------------------------------------
+        #   Comments    : It would be pretty easy and potential 
+                          usefull to allow this to wrap around 
+                          the edges
+        #               : so we can pick zero as a boundry and the 
+                          code will know what todo.
+                          #--------------------------------------------------------------
         """
         x0 = r0[0]
         y0 = r0[1]
@@ -1105,7 +1182,8 @@ class p3d_dump(object):
 
     def interp_field(self,field,lx=None,ly=None,r0=None):
         """
-#---------------------------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------
+        
 #   Method      : interp_field
 #
 #   Discription : This method takes a field and a floating point, and returns the linear fit value 
@@ -1115,9 +1193,10 @@ class p3d_dump(object):
 #               : r0[0] The xpoint to interpolate at
 #               : r0[1] The ypoint to interpolate at
 #
-#   Comments    : I think this is working ok? It would be smart to make this an object method that just reads
+#   Comments    : I think this is working ok? It would be smart to make
+                  this an object method that just reads
 #               : the internally saved field. so CODE IN THE FUTURE
-#---------------------------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------
         """
         if lx is None:lx=self.param_dict['lx']
         if ly is None:ly=self.param_dict['ly']
@@ -1134,14 +1213,14 @@ class p3d_dump(object):
         if jp + 1 > ny-1: jpp1 = 0
         else: jpp1 = jp+1
 
-        print ip,jp,nx,ny
+       # print ip,jp,nx,ny
 
         wx = 1.0*r0[0]/lx*nx - np.floor(1.0*r0[0]/lx*nx)
         wy = 1.0*r0[1]/ly*ny - np.floor(1.0*r0[1]/ly*ny)
 
-        return (1.-wx)*(1.-wy)*field[jp,ip]   +\
-               (wx)   *(1.-wy)*field[jpp1,ip] +\
-               (1.-wx)*   (wy)*field[jp,ipp1] +\
+        return (1.-wx)*(1.-wy)*field[jp  , ip]+\
+               (wx)   *(1.-wy)*field[jpp1, ip]+\
+               (1.-wx)*   (wy)*field[jp  ,ipp1]+\
                (wx)   *   (wy)*field[jpp1,ipp1]
     
 
