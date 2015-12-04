@@ -53,30 +53,117 @@ def TestTen(var,lcl,av=''):
         return False
 
 #======================================================
-def rotate_ten(CR,var='pi',av='av'):
-    bmag = np.sqrt( CR['bx'+av]**2+
-                    CR['by'+av]**2+
-                    CR['bz'+av]**2)
-    bbx = CR['bx'+av]/bmag
-    bby = CR['by'+av]/bmag
-    bbz = CR['bz'+av]/bmag
+def rotate_ten(CR,
+               var='pi',
+               av='av',
+               overwrite=False,
+               full_rotate=False):
 
-    if var+'par'+av in CR.keys():
-        print 'Warning: %sparav was found in the restored data: nothing will be rotated!!!!'
+    if var+'par'+av in CR and not overwrite:
+        print 'Warning: %sparav was found in the' \
+              'restored data: nothing will be rotated!!!!'
         pass
-    else:
-        CR[var+'par'+av] = (bbx*(bbx*CR[var+'xx'+av] + bby*CR[var+'xy'+av] + bbz*CR[var+'xz'+av]) +
-                           bby*(bbx*CR[var+'xy'+av] + bby*CR[var+'yy'+av] + bbz*CR[var+'yz'+av]) +
-                           bbz*(bbx*CR[var+'xz'+av] + bby*CR[var+'yz'+av] + bbz*CR[var+'zz'+av]))
 
-        CR[var+'perp1'+av] = (CR[var+'xx'+av] + CR[var+'yy'+av] +CR[var+'zz'+av] - CR[var+'par'+av])/2.
+        
+    elif full_rotate:
+# e1 -> \hat{B} 
+# e2 -> \hat{ExB}
+# e3 -> \hat{Bx(ExB)}
+        e1 = np.array([CR['bxav'],
+                       CR['byav'],
+                       CR['bzav']])
+
+        e2 = np.cross(np.array([CR['exav'],
+                                CR['eyav'],
+                                CR['ezav']]), e1,axis=0)
+
+        e1 = e1/np.sqrt(np.sum(e1**2,axis=0))
+        e2 = e2/np.sqrt(np.sum(e2**2,axis=0))
+        e3 = np.cross(e1,e2,axis=0)
+
+        T = np.array([[CR[var+'xx'+av],CR[var+'xy'+av],CR[var+'xz'+av]],
+                      [CR[var+'xy'+av],CR[var+'yy'+av],CR[var+'yz'+av]],
+                      [CR[var+'xz'+av],CR[var+'yz'+av],CR[var+'zz'+av]]])
+
+        Te1 = np.array([np.sum(T[0,:,:,:]*e1,axis=0),
+                        np.sum(T[1,:,:,:]*e1,axis=0),
+                        np.sum(T[2,:,:,:]*e1,axis=0)])
+        Te2 = np.array([np.sum(T[0,:,:,:]*e2,axis=0),
+                        np.sum(T[1,:,:,:]*e2,axis=0),
+                        np.sum(T[2,:,:,:]*e2,axis=0)])
+        Te3 = np.array([np.sum(T[0,:,:,:]*e3,axis=0),
+                        np.sum(T[1,:,:,:]*e3,axis=0),
+                        np.sum(T[2,:,:,:]*e3,axis=0)])
+
+        Tpar  = np.sum(e1*Te1,axis=0)
+        Tperp = (T[0,0,:,:] + T[1,1,:,:] + T[2,2,:,:] - Tpar)/2.0
+
+# The diaganal is easy, we pick perp1 = perp2
+        CR[var+'par'+av]   = Tpar
+        CR[var+'perp1'+av] = Tperp
+        CR[var+'perp2'+av] = Tperp
+
+        a = np.sum(e2*Te1,axis=0)
+        b = np.sum(e3*Te1,axis=0)
+        c = np.sum(e2*Te2,axis=0)
+        d = np.sum(e3*Te2,axis=0)
+        e = np.sum(e3*Te3,axis=0)
+        
+        x = (c - e)/d/2.
+        ct = np.sqrt(1. + 1./np.sqrt((1.+ (x)**2)))/np.sqrt(2)
+        st = x/(np.sqrt(2.)*np.sqrt(x**2.+1.)*\
+                np.sqrt(1./np.sqrt(x**2.+1.)+1.))
+
+        T11 = Tpar
+        T12 = a*ct - b*st
+        T13 = a*st + b*ct
+        T22 = c*ct**2 + e*st**2 - 2.*d*st*ct
+        T23 = (c - e)*st*ct + d*(ct**2 - st**2)
+        T33 = c*st**2 + e*ct**2 + 2.*d*st*ct
+
+        CR[var+'11'+av] = T11
+        CR[var+'12'+av] = T12
+        CR[var+'13'+av] = T13
+        CR[var+'22'+av] = T22
+        CR[var+'23'+av] = T23
+        CR[var+'33'+av] = T23
+
+        # Now Agyrotropy code!
+        CR[var+'agy'+av] = np.sqrt(2.*(T12**2 + T13**2 + T23**2)) \
+                                 /(T11 + T22 + T33) 
+    else:
+# This was the old way, and it was very simple
+
+        bmag = np.sqrt( CR['bx'+av]**2+
+                        CR['by'+av]**2+
+                        CR['bz'+av]**2)
+        bbx = CR['bx'+av]/bmag
+        bby = CR['by'+av]/bmag
+        bbz = CR['bz'+av]/bmag
+
+        CR[var+'par'+av] = (bbx*(bbx*CR[var+'xx'+av] + 
+                                 bby*CR[var+'xy'+av] + 
+                                 bbz*CR[var+'xz'+av])+
+                            bby*(bbx*CR[var+'xy'+av] + 
+                                 bby*CR[var+'yy'+av] + 
+                                 bbz*CR[var+'yz'+av])+
+                            bbz*(bbx*CR[var+'xz'+av] + 
+                                 bby*CR[var+'yz'+av] + 
+                                 bbz*CR[var+'zz'+av]))
+
+        CR[var+'perp1'+av] = (CR[var+'xx'+av] + 
+                              CR[var+'yy'+av] +
+                              CR[var+'zz'+av] - 
+                              CR[var+'par'+av])/2.
+
         CR[var+'perp2'+av] = CR[var+'perp1'+av]
 
 #======================================================
 
 def ims(fdic,key,ax=None,extent='',**kwargs):
     """
-    A wrapper function for imshow to do most tedious stuff for my simulations
+    A wrapper function for imshow to do most 
+    tedious stuff for my simulations
     """
     if ax is None: ax = plt.gca()
 
