@@ -147,7 +147,7 @@ class p3d_movie(object):
 
             if time == 'all':
                 time = range(self.num_of_times)
-            elif type(time) == str:
+            elif type(time) is str:
                 time = [int(x) for x in time.split()]
             elif type(time) is int:
                 time = [time]
@@ -188,7 +188,6 @@ class p3d_movie(object):
                 shft_cst = 0.0 
 
             
-            _ = 0 # This keeps track of where we are
             lmin = np.array(self.movie_log_dict[cosa])[:,0]
             lmax = np.array(self.movie_log_dict[cosa])[:,1]
             self.lmm = (lmin,lmax)
@@ -196,18 +195,16 @@ class p3d_movie(object):
             #print 'dat_type = ',dat_type
             grid_pts = ney*nex
             with open(fname,'r') as f: 
-                for i,chose in enumerate(time):
-                    f.seek((chose - _)*grid_pts*dat_type.itemsize, os.SEEK_SET)
-                    byte_arr[i,:,:] = np.fromfile(f, 
+                for _,chose in enumerate(time):
+                    f.seek(chose*grid_pts*dat_type.itemsize, 0)
+                    byte_arr[_,:,:] = np.fromfile(f, 
                                                   dtype=dat_type,
                                                   count=grid_pts
                                                   ).reshape(ney,nex)
     
-                    byte_arr[i,:,:] = (1.0*byte_arr[i,:,:] + shft_cst)* \
+                    byte_arr[_,:,:] = (1.0*byte_arr[_,:,:] + shft_cst)* \
                                       (lmax[chose]-lmin[chose]) \
                                       /(1.0*norm_cst) + lmin[chose]
-
-                    _ = chose + 1
 
             return_dict[cosa] = np.squeeze(byte_arr)
 
