@@ -59,16 +59,18 @@ def plot_2D(ax,CR,var,
     ax.set_xlabel(r'$X (d_i)$',size=8)
     ax.set_ylabel(r'$Y (d_i)$',size=8)
     ax.set_title(title+': %1.3f, %1.3f'%(var.min(),var.max()),size=8)
-
-    ax.xaxis.set_tick_params(which='both',labelsize=8)
-    ax.yaxis.set_tick_params(which='both',labelsize=8)
+    
+    lsz = 6
+    ax.xaxis.set_tick_params(which='both',labelsize=lsz)
+    ax.yaxis.set_tick_params(which='both',labelsize=lsz)
 
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", "3%", pad="1.5%")
     plt.colorbar(im, cax=cax)
 
-    cax.xaxis.set_tick_params(which='both',labelsize=8)
-    cax.yaxis.set_tick_params(which='both',labelsize=8)
+    lsz = 6
+    cax.xaxis.set_tick_params(which='both',labelsize=lsz)
+    cax.yaxis.set_tick_params(which='both',labelsize=lsz)
     plt.sca(ax)
     plt.minorticks_on()
 
@@ -99,7 +101,8 @@ def plot_1D(ax,CR,var,
 
     lgargs = kwargs.pop('lgargs',None)
     no_lines = kwargs.pop('no_lines',False)
-    c_itter = ['r','b','g','k']
+    c_itter = kwargs.pop('c_itter',['r','b','g','k'])
+
     if dir == 'y':
 
         ip = abs(CR['xx'] - loc).argmin()
@@ -138,9 +141,9 @@ def plot_1D(ax,CR,var,
             ax.set_xlim(CR['yy'][[0,-1]])
         else:
             ax.set_xlim(CR['xx'][[0,-1]])
-
-    ax.xaxis.set_tick_params(which='both',labelsize=8)
-    ax.yaxis.set_tick_params(which='both',labelsize=8)
+    lsz = 6
+    ax.xaxis.set_tick_params(which='both',labelsize=lsz)
+    ax.yaxis.set_tick_params(which='both',labelsize=lsz)
     ax.set_title('cut @ x = %1.2f'%loc,size=8,loc='right')
 
     ax.autoscale(False)
@@ -151,8 +154,10 @@ def plot_1D(ax,CR,var,
         for offset in vcuts:
             draw_line(ax,cut='y',offset=offset)
     else:
+# Draw line at mind plane
+        xmp = CR['yy'][abs(CR['bxav'][:,ip]).argmin()]
         draw_line(ax,cut='x',offset=0.)
-        draw_line(ax,cut='y',offset=0.)
+        draw_line(ax,cut='y',offset=xmp)
 
     plt.sca(ax)
     plt.minorticks_on()
