@@ -56,8 +56,8 @@ def plot_2D(ax,CR,var,
         ax.set_ylim(extent[2:])
     ax.autoscale(False)
     
-    ax.set_xlabel(r'$X (d_i)$',size=8)
-    ax.set_ylabel(r'$Y (d_i)$',size=8)
+    ax.set_xlabel(r'$X\ (d_i)$',size=8)
+    ax.set_ylabel(r'$Y\ (d_i)$',size=8)
     ax.set_title(title+': %1.3f, %1.3f'%(var.min(),var.max()),size=8)
     
     lsz = 6
@@ -158,6 +158,8 @@ def plot_1D(ax,CR,var,
         xmp = CR['yy'][abs(CR['bxav'][:,ip]).argmin()]
         draw_line(ax,cut='x',offset=0.)
         draw_line(ax,cut='y',offset=xmp)
+# or just draw it at the new 0
+        #draw_line(ax,cut='y',offset=0.)
 
     plt.sca(ax)
     plt.minorticks_on()

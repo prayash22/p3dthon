@@ -269,6 +269,7 @@ def calc_psi(CR):
     else:
         bx = CR['bx']
         by = CR['by']
+
     psi = 0.0*bx
     psi[0,1:] = np.cumsum(by[0,1:])*(CR['yy'][2] - CR['yy'][1])
     psi[1:,:] = psi[0,:] - np.cumsum(bx[1:,:],axis=0)*(CR['xx'][2] - CR['xx'][1])
@@ -385,15 +386,30 @@ def roll_run(CR,sx=None):
     """ Roll every variable in a simulation (CR)
         in the x direction by length in indexspace (sx)
     """
+    klst = ['rho','jx','jy','jz','bx','by','bz',
+            'ex','ey','ez','ne','jex','jey','jez',
+            'pexx','peyy','pezz','pexy','peyz','pexz',
+            'ni','jix','jiy','jiz','vix','viy','viz',
+            'vex','vey','vez','dene','deni',
+            'pixx','piyy','pizz','pixy','piyz','pixz',
+            'tepar','teperp1','tipar','tiperp1']
 
+    kavlst = [k+'av' for k in klst]
     if sx is None:
         if CR['yy'][0] < 1.0: 
+            print 'Gonna roll RIGHT!!!!!!!!!!!!'
             sx = -1*np.size(CR['xx'])/4
         else: 
+            print 'Gonna roll LEFT!!!!!!!!!!!!'
             sx = np.size(CR['xx'])/4
     
     for key in CR.keys():
-        if key.rfind('av') == len(key)-2 and len(key) > 2:
+# Old way not super smart
+#        if key.rfind('av') == len(key)-2 and len(key) > 2:
+#            print 'Rolling ',key
+#            CR[key] = np.roll(CR[key],sx,axis=1)
+# New way a little bit smarter
+        if key in klst or key in kavlst:
             print 'Rolling ',key
             CR[key] = np.roll(CR[key],sx,axis=1)
 

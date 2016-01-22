@@ -195,14 +195,15 @@ class p3d_movie(object):
             #print 'dat_type = ',dat_type
             grid_pts = ney*nex
             with open(fname,'r') as f: 
-                for _,chose in enumerate(time):
+                for c,chose in enumerate(time):
+
                     f.seek(chose*grid_pts*dat_type.itemsize, 0)
-                    byte_arr[_,:,:] = np.fromfile(f, 
+                    byte_arr[c,:,:] = np.fromfile(f, 
                                                   dtype=dat_type,
                                                   count=grid_pts
                                                   ).reshape(ney,nex)
     
-                    byte_arr[_,:,:] = (1.0*byte_arr[_,:,:] + shft_cst)* \
+                    byte_arr[c,:,:] = (1.0*byte_arr[c,:,:] + shft_cst)* \
                                       (lmax[chose]-lmin[chose]) \
                                       /(1.0*norm_cst) + lmin[chose]
 
