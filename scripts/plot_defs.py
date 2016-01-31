@@ -52,8 +52,20 @@ def plot_2D(ax,CR,var,
     im = ax.imshow(var,extent=ext,origin='low',**kwargs)
     
     if type(extent) is not str:
+        print 'hello????'
         ax.set_xlim(extent[:2])
         ax.set_ylim(extent[2:])
+        ip1 = int(round((extent[0]-CR['xx'][0])/(CR['xx'][1] - CR['xx'][0])))
+        ip2 = int(round((extent[1]-CR['xx'][0])/(CR['xx'][1] - CR['xx'][0])))
+        jp1 = int(round((extent[2]-CR['yy'][0])/(CR['yy'][1] - CR['yy'][0])))
+        jp2 = int(round((extent[3]-CR['yy'][0])/(CR['yy'][1] - CR['yy'][0])))
+        print 'clim was: ',im.get_clim()
+        im.set_clim(var[jp1:jp2,ip1:ip2].min(),var[jp1:jp2,ip1:ip2].max())
+        print 'clim is : ',im.get_clim()
+
+
+# Fix the clim stuff here
+
     ax.autoscale(False)
     
     ax.set_xlabel(r'$X\ (d_i)$',size=8)

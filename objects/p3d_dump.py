@@ -554,18 +554,23 @@ class p3d_dump(object):
                 if species == 'e':
                     reltv = True
                     if reltv:
-                        v2 = (self.particles[species]['vx']**2+
-                              self.particles[species]['vy']**2+
-                              self.particles[species]['vz']**2)
+                        #v2 = (self.particles[species]['vx']**2+
+                        #      self.particles[species]['vy']**2+
+                        #      self.particles[species]['vz']**2)
+
+                        v2 = vax**2 + vp0**2 + vp1**2
 
                         KE = self.param_dict['m_e']* self.param_dict['c_2']*\
                              (1./np.sqrt(1. - v2/self.param_dict['c_2']) - 1.)
 
                     else:
+                        #KE = self.param_dict['m_e']/2.0*\
+                        #    (self.particles[species]['vx']**2+
+                        #     self.particles[species]['vy']**2+
+                        #     self.particles[species]['vz']**2)
+
                         KE = self.param_dict['m_e']/2.0*\
-                            (self.particles[species]['vx']**2+
-                             self.particles[species]['vy']**2+
-                             self.particles[species]['vz']**2)
+                             (vax**2 + vp0**2 + vp1**2)
 # Muck ===============
 #                   print 'More Mucking!!!'
 #                   KE = self.param_dict['m_e']/2.0*(v0**2+
