@@ -1,10 +1,12 @@
+import time
+import operator
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.colors import LinearSegmentedColormap
 from scipy.io.idl import readsav 
+from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.ticker import AutoMinorLocator
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 from p3d_runs import p3d_run
-import time
 
 #======================================================
 def set_local(IDL_restore,lcl):
@@ -161,12 +163,21 @@ def rotate_ten(CR,
 
 #======================================================
 
-def ims(fdic,key,ax=None,extent='',**kwargs):
+def ims(fdic,
+        key,
+        ax=None,
+        extent=None,
+        cbar=None,
+        **kwargs):
     """
     A wrapper function for imshow to do most 
     tedious stuff for my simulations
     """
-    if ax is None: ax = plt.gca()
+    old_ax = plt.gca() # Get Current Axis
+    if ax is None: 
+        ax = old_ax
+    else:
+        plt.sca(ax)    # Set Current Axis
 
 # Use the dict values of xx and yy to set extent
     ext = [fdic['xx'][0],
@@ -180,40 +191,47 @@ def ims(fdic,key,ax=None,extent='',**kwargs):
     if kwargs.has_key('cmap'): cmap=kwargs.pop('cmap')
     else:                      cmap='PuOr'
 
-    return_ims = ax.imshow(plt_val,
+    im = ax.imshow(plt_val,
                            origin='low',
                            extent=ext,
                            cmap=cmap,            # I just love this color map
                            **kwargs)
 
-    if type(extent) is not str:
+    if extent is not None:
         ax.set_xlim(extent[:2])
         ax.set_ylim(extent[2:])
+
     ax.autoscale(False)
 
     ax.set_xlabel(r'$X (d_i)$',size=8)
     ax.set_ylabel(r'$Y (d_i)$',size=8)
 
     ax.xaxis.set_tick_params(which='both',labelsize=8)
-    minorLocator = AutoMinorLocator()           # Note the second call is so that the minor x ticks are not
-    ax.xaxis.set_minor_locator(minorLocator)    # the same as the y ticks
+    #minorLocator = AutoMinorLocator()           # Note the second call is so that the minor x ticks are not
+    #ax.xaxis.set_minor_locator(minorLocator)    # the same as the y ticks
 
     ax.yaxis.set_tick_params(which='both',labelsize=8)
-    minorLocator = AutoMinorLocator()
-    ax.yaxis.set_minor_locator(minorLocator)
+    #minorLocator = AutoMinorLocator()
+    #ax.yaxis.set_minor_locator(minorLocator)
+
+    plt.minorticks_on()
+    plt.sca(old_ax)
 
     # Code to implement for a cbar
-    #divider = make_axes_locatable(ax)
-    #cax = divider.append_axes("right", "3%", pad="1.5%")
-    #plt.colorbar(im, cax=cax)
+    if cbar:
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", "3%", pad="1.5%")
+        plt.colorbar(im, cax=cax)
 
-    #cax.xaxis.set_tick_params(which='both',labelsize=8)
-    #cax.yaxis.set_tick_params(which='both',labelsize=8)
+        cax.xaxis.set_tick_params(which='both',labelsize=8)
+        cax.yaxis.set_tick_params(which='both',labelsize=8)
 
-    # Giveing the plot minor tick marks
+        plt.draw()
+        return im,cax
 
-    plt.draw()
-    return return_ims
+    else:
+        return im
+
 
 #======================================================
 
@@ -298,14 +316,19 @@ def plot_line(itcpt,dir='y',ax=None,**kwargs):
 
 #======================================================
 
-def avg_movie():
+def avg_movie(fname=None, 
+              param=None,
+              mov=None,
+              ntimes=None,
+              save_full=None):
     
     way = 'slow'
 
-    fname = raw_input('Enter Save file name base: ')
+    if fname is None:
+        fname = raw_input('Enter Save file name base: ')
 
     if way == 'fast':
-        CC = p3d_run('local')
+        CC = p3d_run('local',param=param)
         print 'Loading time %i'%0
         CR = CC.load_movie('all',0)
 
@@ -317,7 +340,7 @@ def avg_movie():
 
         t = time.time()
         for k in keys:
-            _ = CC.load_movie(k,range(1,ntimes))
+            _ = CC.load_movie(k,range(1,ntimes),mov)
             CR[k] += np.sum(_[k],axis=0) # sum along time
             CR[k+'av'] = CR[k]/1.0/ntimes
             CR[k] = _[k][-1,:,:]
@@ -326,11 +349,12 @@ def avg_movie():
 
     else:
     ## First way I tried, maybe slow?
-        CC = p3d_run('local')
+        CC = p3d_run('local',param=param)
         print 'Loading time %i'%0
-        CR = CC.load_movie('all',0)
-
-        ntimes = CC.movie.num_of_times
+        CR = CC.load_movie('all',0,mov)
+        
+        if ntimes is None:
+            ntimes = CC.movie.num_of_times
 
         keys = CR.keys()
         keys.pop(keys.index('xx'))
@@ -378,6 +402,9 @@ def avg_movie():
         print 'Saving upper data...'
         np.save(fname+'_upper',CRU)
 
+        if save_full:
+            np.save(fname,CR)
+
     return CR
 
 
@@ -418,7 +445,11 @@ def roll_run(CR,sx=None):
 
 def readsave(restore_fname):
     if restore_fname[restore_fname.rfind('.'):] == '.npy':
-        return np.load(restore_fname).all()
+        cr = np.load(restore_fname).all()
+        for v in ['ni', 'ne', 'niav', 'neav']:
+            if v in cr:
+                cr['de'+v] = cr[v]
+        return cr
     else:
         return readsav(restore_fname)
 
@@ -593,3 +624,34 @@ def colby_ct():
 
     g_modr = LinearSegmentedColormap('g_modr', g_modr)
     plt.register_cmap(cmap=g_modr)
+
+
+def calc_pdf(ar,min=99999,max=99999,weight=100,inc=0,ax=0):
+   if len(ar) == 0:
+      print 'No array provided! Exiting!'
+      return
+   if min == 99999:
+      min=ar.min()
+   if max == 99999:
+      max=ar.max()
+   # If PDF of increment, then increment the array
+   if inc > 0:
+      ar = ar - np.roll(ar,inc,axis=ax)
+   # Find the total length of data set
+   arsize=reduce(operator.mul, np.shape(ar),1)
+   # Find the RMS value of data set and normalize to it.
+   rmsval = np.sqrt(np.mean(ar**2))
+   if rmsval != 0:
+      ar = ar/rmsval
+   # Reshape the array to 1D & sort it.
+   arr=np.reshape(ar,arsize)
+   np.ndarray.sort(arr,kind='heapsort')
+   # Empty arrays for output
+   bins=int(arsize/weight); pdf=np.zeros(bins); binvals=np.zeros(bins)
+   # Fill the bins 
+   for i in range(bins):
+      start=i*weight
+      binvals[i] = np.mean(arr[start:start+weight])
+      pdf[i] = weight/(arr[start:start+weight].max()-arr[start:start+weight].min())
+   pdf = pdf/arsize
+   return binvals,pdf

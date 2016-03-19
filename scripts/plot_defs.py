@@ -186,10 +186,10 @@ def draw_line(ax,cut='x',offset=0.):
     bgarr = np.array([-10000,10000])
 
     if cut == 'x':
-        ax.plot(bgarr, np.zeros(2)+offset, 'k--')
+        ax.plot(bgarr, np.zeros(2)+offset, 'k--',linewidth=.6)
 
     elif cut == 'y':
-        ax.plot(np.zeros(2)+offset, bgarr, 'k--')
+        ax.plot(np.zeros(2)+offset, bgarr, 'k--',linewidth=.6)
 
     else: print 'What?'
         

@@ -80,19 +80,31 @@ class p3d_movie(object):
 
 
         #Set moive.log path
+        if 'four_byte' not in self.param_dict: #single byte precision
+            fname = self.movie_path+'/movie.log.'+self.movie_num_str
+            fname = os.path.abspath(fname)
+            print "Loading movie.log file '%s'"%fname
+            #Read moive.log
+            movie_log_arr = np.loadtxt(fname) 
+            self.num_of_times = len(movie_log_arr)/len(self.movie_arr)
+            print "movie.log '%s' has %i time slices"%(fname,self.num_of_times)
+            
+            for n in range(len(self.movie_arr)):
+                self.movie_log_dict[self.movie_arr[n]] = []
+            for n in range(len(movie_log_arr)):
+                self.movie_log_dict[self.movie_arr[n%len(self.movie_arr)]].append(movie_log_arr[n,:]) 
 
-        fname = self.movie_path+'/movie.log.'+self.movie_num_str
-        fname = os.path.abspath(fname)
-        print "Loading movie.log file '%s'"%fname
-        #Read moive.log
-        movie_log_arr = np.loadtxt(fname) 
-        self.num_of_times = len(movie_log_arr)/len(self.movie_arr)
-        print "movie.log '%s' has %i time slices"%(fname,self.num_of_times)
-        
-        for n in range(len(self.movie_arr)):
-            self.movie_log_dict[self.movie_arr[n]] = []
-        for n in range(len(movie_log_arr)):
-            self.movie_log_dict[self.movie_arr[n%len(self.movie_arr)]].append(movie_log_arr[n,:]) 
+        else:
+            fname = self.movie_path+'/movie.bz.'+self.movie_num_str
+            nex = self.param_dict['pex']*self.param_dict['nx']
+            ney = self.param_dict['pey']*self.param_dict['ny']
+
+            print  os.path.getsize(fname)/4/nex/ney
+            self.num_of_times = os.path.getsize(fname)/4/nex/ney
+            for k in self.movie_arr:
+                self.movie_log_dict[k] = [np.array([0.,1.]) for c in 
+                                          range(self.num_of_times)]
+
 
 # STRUCTURE OF movie_log_dict{}
 #   movie_log_dict is a dictionary of all the of the varibles that could be read in a movie file
@@ -168,6 +180,7 @@ class p3d_movie(object):
             nex = self.param_dict['pex']*self.param_dict['nx']
             ney = self.param_dict['pey']*self.param_dict['ny']
 
+            
             #NOTE: we are reading the whole movie file in one shot!
             # this seems wastefull
             #print "Restoring Varible '%s' From File '%s'"%(cosa,fname)
@@ -181,6 +194,10 @@ class p3d_movie(object):
                 dat_type = np.dtype('int16')
                 norm_cst = 256**2-1
                 shft_cst = 1.0*256**2/2
+            elif 'four_byte' in self.param_dict: #single byte precision
+                dat_type = np.dtype('float32')
+                norm_cst = 1.
+                shft_cst = 0.
             else: #single byte precision
                 #dat_type = 'int8'
                 dat_type = np.dtype('uint8')
@@ -214,9 +231,10 @@ class p3d_movie(object):
         
 
     def _movie_num_options(self):
-        choices = glob.glob(self.movie_path+'/movie.log.*')
+        choices = glob.glob(self.movie_path+'/movie.bz.*')
         if len(choices) == 0: 
-            print '!!! WARNING: the direcotry we are looking in does not have any moive.log.XXX so we are crashing'
+            print '!!! WARNING: the direcotry we are looking in does not'\
+                  ' have any moive.bz.XXX so we are crashing'
             return -1
         for var in range(np.size(choices)):
             choices[var] = choices[var][-3:]
