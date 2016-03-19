@@ -112,7 +112,10 @@ def var_at(fdic,key,r0,ordflg='idl'):
 
 def load_movie(**kwargs):
     print 'not coded yet...'
-    return p3d_run('local').load_movie('all')
+    d = p3d_run('local').load_movie('all')
+    for keys in d.keys():
+        locals()[keys] = d[keys]
+    return d
 
 def show_energy(fname=None):
     if fname is None:
