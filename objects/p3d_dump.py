@@ -1,18 +1,13 @@
-########################################################################################################################################################
-########################################################################################################################################################
-#                                                                                                                                                      #
-#                                                 Python Progs :  p3d_dump.py                                                                         #
-#                                                 Aruthor      :  Colby Haggerty                                                                       #
-#                                                 Date         :  2014.08.15                                                                           #
-#                                                                                                                                                      #
-#                                                                                                                                                      #
-########################################################################################################################################################
+#######################################################################
+#######################################################################
+#                                                                     #
+#                  Python Progs :  p3d_dump.py                        #
+#                  Aruthor      :  Colby Haggerty                     #
+#                  Date         :  2014.08.15                         #
+#                                                                     #
+#                                                                     #
+#######################################################################
 ### Discription:
-#
-#       p3d_movie class is a movie object to be handled by p3d_run. This object keeps all of the information for a  
-#       given movie. We have seperated this from the p3d_object to keep things neatter and cleaner. The plan is then
-#       apply this same idea to the dump files. NOTE there may be a time trade off issue between this and doing every
-#       thing together, but i dont think that will be an issue.
 #
 
 import os
@@ -21,10 +16,19 @@ import datetime
 import numpy as np
 import struct
 import glob
+import pdb
 from scipy.io.idl import readsav
+from scipy.ndimage import gaussian_filter
 
 class p3d_dump(object):
-    """p3d_run object """
+    """p3d_run object 
+
+        p3d_movie class is a movie object to be handled by p3d_run. This object
+        keeps all of the information for a  given movie. We have seperated this from the
+        p3d_object to keep things neatter and cleaner. The plan is then apply this same
+        idea to the dump files. NOTE there may be a time trade off issue between this
+        and doing every thing together, but i dont think that will be an issue.  #
+    """
 
     def __init__(self, dump_path, param_dict, dump_num=-1): 
         """ Initilazition Routine for the p3d_run object
@@ -55,20 +59,52 @@ class p3d_dump(object):
         if 'stat_ions' in self.param_dict: self.species = ['i','e'] 
         else: self.species = ['i','e'] #all species contained within dump files. will need to recode for multi species
 
+# this method assumes that particles are already laoded
+    def moments(self):
+        num_es = np.size(self.particles['e'])
+        box_area = self._dx[0]*self._dx[1]
+        dx = self.param_dict['lx']/self.param_dict['nx']/self.param_dict['pex']
+        dy = self.param_dict['ly']/self.param_dict['ny']/self.param_dict['pey']
+ #sloopying coding, kmalakit uses n1 and marc uses n0
+        n0 = float(self.param_dict.get('n0',self.param_dict['n1']))
+        ppdi = self.param_dict['ppg']/dx/dy/n0
 
+        ne_loc = num_es/box_area/ppdi
+        
+        uex_loc = np.mean(self.particles['e']['vx'])
+        uey_loc = np.mean(self.particles['e']['vy'])
+        uez_loc = np.mean(self.particles['e']['vz'])
+
+        pexx_loc = np.mean((self.particles['e']['vx'] - uex_loc)**2)
+        peyy_loc = np.mean((self.particles['e']['vy'] - uey_loc)**2)
+        pezz_loc = np.mean((self.particles['e']['vz'] - uez_loc)**2)
+
+
+        print 'local ne    : ',ne_loc
+        print 'local uex   : ',uex_loc
+        print 'local uey   : ',uey_loc
+        print 'local uez   : ',uez_loc
+        print 'local pexx  : ',pexx_loc
+        print 'local peyy  : ',peyy_loc
+        print 'local pezz  : ',pezz_loc
+        pass
+        
 
     def read_dump_file(self,dump_index=-1,fields=False,verbose=False):
         """
-#---------------------------------------------------------------------------------------------------------------
+#-----------------------------------------------------------------------------
 #   Method      : read_dump_file
 # 
-#   Args        : dump_index (is the middle 3 digets of the dump file. This corseponds to the processors)
-#               : dump_num (is the last 3 digets of the dump file. This spesifies which run)
+#   Args        : dump_index (is the middle 3 digets of the dump file. This 
+#                 orseponds to the processors)
+#               : dump_num (is the last 3 digets of the dump file. This 
+#                 spesifies which run)
 # 
-#   BIG NOTE    : This assumes that we are looking at 2 D dump files! so file 1 is field file 
+#   BIG NOTE    : This assumes that we are looking at 2 D dump files! so file 1 
+#                 is field file 
 # 
 #   Comment     : 
-#---------------------------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------
         """
         
         return_dict = {}
@@ -98,6 +134,7 @@ class p3d_dump(object):
 # If the dump file we are trying to read is the first, we need to first read the fields and then the particles 
         if dump_index == '001':
             return_dict = self._get_fields()
+            self.fields = return_dict
 # Now we open 
         if not fields:
             return_dict = dict(self._get_particles().items() + return_dict.items())
@@ -240,59 +277,93 @@ class p3d_dump(object):
         movie_num_int = raw_input()
         return int(movie_num_int)
 
-    def vdist_2d(self,r0=[0.5,0.5],dx=[1.0,1.0],par=False,Bvec=False,pitch=False,OneD=False,**kwargs):
-        """Generates differnent 2-Dimensional histograms for particles 
+    def vdist_2d(self,
+                 r0=[0.5,0.5],
+                 dx=[1.0,1.0],
+                 par=False,
+                 Bvec=False,
+                 pitch=False,
+                 pizza=False,
+                 OneD=False,
+                 **kwargs):
+
+        """ Generates differnent 2-Dimensional histograms for particles 
+            Please god colby add a doc string!!!
         """
+
+        self._par   = par
+        self._pizza = pizza
+        self._Bvec  = Bvec
+
+        if isinstance(dx,float):
+            dx = [dx,dx] # Square box. Does this change dx?
+
 # Turn this into a method
 #%%%%%%%%%%%%%%%
         if OneD: # Make dy = ly
             r0[1] = self.param_dict['ly']/2.0
             dx = [dx[0], self.param_dict['ly']/2.0]
         if not hasattr(self,'_r0') or not hasattr(self,'particles'):
-            self._r0 = r0
-            self._dx = dx
+            self._r0 = r0[:]
+            self._dx = dx[:]
 # Calling get particles in box to make the vdist
             #qc#print 'Reading Ions and Electrons from the Dump File'
             self.particles = self._part_in_box(r0,dx)
         else:
-            if (self._r0[0] == r0[0]) and (self._r0[1] == r0[1]) and (self._dx == dx):
-                print '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
-                print '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Same r0 and dx found, using old particles ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
-                print 'r0 = '+str(r0)+' _r0 = '+str(self._r0)
-                print '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
-                print '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
+            if (self._r0[0] == r0[0]) and \
+               (self._r0[1] == r0[1]) and \
+               (self._dx[0] == dx[0]) and \
+               (self._dx[1] == dx[1]):
+
+                print '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
+                print '~~~ Same r0 and dx found, using old particles ~~~'
+                print '~~~ r0 = '+str(r0)+' _r0 = '+str(self._r0)  
+                print '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
+
             else:
-                self._r0 = r0
-                self._dx = dx
+                self._r0 = r0[:]
+                self._dx = dx[:]
                 #qc#print 'Reading Ions and Electrons from the Dump File'
                 self.particles = self._part_in_box(r0,dx)
-#%%%%%%%%%%%%%%%
 
-# Reading in fields to calculate vpar
-# Now there are two ways to do this, a faster and a slower
-# Faster: just take the average B field and and use that
-#         for every particle
-# Slower: Use an interpolated Bfield for each point
-#
-# Right now im only coding the faster one
+        #print '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
+        #print kwargs
+        #if kwargs.pop('v0_frame',False):
+        #    print 'THE SHIFFFFFFTTTTINGGGGGG!!!!!!'
+        #    self._shift_frame()
+
         if not kwargs.has_key('bins'): kwargs['bins']=51
-        if par or Bvec or pitch:
+        if par or Bvec or pitch or pizza:
             #qc#print 'Reading in the Fields form the Dump File'
             self.dump_field_dict = self.read_dump_file(fields=True)
             if pitch:
-                return_hist = self._vdist_pitch(par,**kwargs)
-            elif par and not pitch:
+                return_hist = self._vdist_pitch(par=par,**kwargs)
+            elif pizza:
+                return_hist = self._vdist_pizza(par,**kwargs)
+            elif par and not pitch and not pizza:
                 return_hist = self._vdist_2d_par(**kwargs)
             else:
                 return_hist = self._vdist_2d(**kwargs)
                 #qc#print 'Interpolating the Bfield at the given r0 value'
-                return_hist['B'] = np.array([self.interp_field(self.dump_field_dict['bx']), \
-                                             self.interp_field(self.dump_field_dict['by']), \
-                                             self.interp_field(self.dump_field_dict['bz'])])
+                return_hist['B'] = np.array([
+                   self.interp_field(self.dump_field_dict['bx']),
+                   self.interp_field(self.dump_field_dict['by']), 
+                   self.interp_field(self.dump_field_dict['bz'])])
         else:
             return_hist = self._vdist_2d(**kwargs)
 
+        self._box = [self._r0[0]-self._dx[0]/2.,
+                     self._r0[0]+self._dx[0]/2.,
+                     self._r0[1]-self._dx[1]/2.,
+                     self._r0[1]+self._dx[1]/2.]
+
+        return_hist['box'] = self._box
+
         return return_hist
+
+
+
+
 
 #wut?    def _vdist_pitch(self,**kwargs):
 #wut?        bx_interp = self.interp_field(self.dump_field_dict['bx'],self.param_dict['lx'],self.param_dict['ly'],self._r0)
@@ -357,21 +428,18 @@ class p3d_dump(object):
 #wut?        return return_hist_dict
 
 
-    def _vdist_pitch(self,par=False,**kwargs): 
+    def _vdist_pitch(self,par=False,energy=False,**kwargs): 
+        """ Pitch party!!!!
+        """
 # I have a lot of code that can return a 2D distrubution function for a givn pitch angle range
 # but I don't think that this will ever be usefull... I should remove it
-        if not kwargs.has_key('pa'): pa = 90. #pa = pitch_angle, but I am lazy
-        else: pa = kwargs.pop('pa') 
-        if not kwargs.has_key('dpa'): dpa = 5.
-        else: dpa = kwargs.pop('dpa') 
+        pa  = kwargs.pop('pa',90.)
+        dpa = kwargs.pop('dpa',5.)
+        wax = kwargs.pop('wax',0)
+        v0_frame = kwargs.pop('v0_frame',None)
 
-        if kwargs.has_key('energy'): energy = kwargs.pop('energy')
-        else: energy = False
-        if not kwargs.has_key('pa'): pa = 90. #pa = pitch_angle, but I am lazy
-        else: pa = kwargs.pop('pa') 
-        if not kwargs.has_key('wax'): wax = 0 #pa = which_axsis, but I am lazy
-        else: wax = kwargs.pop('wax') 
-        if energy: par = True
+        if energy: par = True; kwargs['normed'] = True
+        self._wax = wax
 ##############################################
 
         if par:
@@ -383,16 +451,29 @@ class p3d_dump(object):
                                   self.interp_field(self.dump_field_dict['ey'],self.param_dict['lx'],self.param_dict['ly'],self._r0),
                                   self.interp_field(self.dump_field_dict['ez'],self.param_dict['lx'],self.param_dict['ly'],self._r0)])
 
-            exb = np.cross(e_interp,b_interp)
-            exb = exb/np.sqrt(sum(exb**2))
+            exb = np.cross(e_interp,b_interp)/sum(b_interp**2)
+            if abs(np.sqrt(sum(exb**2))) < np.spacing(10):
+                exb = np.cross(np.array([0.,1.,1.]),b_interp)
+                exb = exb/np.sqrt(sum(exb**2))
+            else:
+                exb = exb/np.sqrt(sum(exb**2))
 
             b_interp = b_interp/np.sqrt(sum(b_interp**2))
 
             bxexb = np.cross(b_interp,exb) 
+            #print b_interp
+            #print exb
+            #print bxexb
 
         velo={}
         return_hist_dict = {}
         self.subpart = {}
+        #print 'Mucking this up!!'
+        #Npart = np.shape(self.particles['e']['vx'])
+        #self.particles['e']['vx'] = 1.*np.random.normal(scale=2.5,size=Npart)
+        #self.particles['e']['vy'] = 1.*np.random.normal(scale=2.5,size=Npart)
+        #self.particles['e']['vz'] = 1.*np.random.normal(scale=2.5,size=Npart)
+        #print 'Done Mucking this up!!!'
         for species in self.species:
        
             if par:
@@ -407,6 +488,13 @@ class p3d_dump(object):
                 v2 = (bxexb[0]*self.particles[species]['vx']+
                       bxexb[1]*self.particles[species]['vy']+
                       bxexb[2]*self.particles[species]['vz'])
+# Muck ===============
+#               print 'Mucking this up!!!'
+#               Npart = 1000000
+#               v0 = 1.*np.random.normal(scale=np.sqrt(50.),size=Npart)
+#               v1 = 1.*np.random.normal(scale=np.sqrt(50.),size=Npart)
+#               v2 = 1.*np.random.normal(scale=np.sqrt(50.),size=Npart)
+# Muck ===============
             else:
                 v0 = self.particles[species]['vx']
                 v1 = self.particles[species]['vy']
@@ -419,7 +507,7 @@ class p3d_dump(object):
             elif wax == 1:
                 vp0 = v0
                 vp1 = v1
-                vax = v1
+                vax = v2
             elif wax == 2:
                 vp0 = v0
                 vp1 = v1
@@ -430,8 +518,23 @@ class p3d_dump(object):
                 print 'vdist_2d is crashing!!!!'
                 print ''
             
+            if v0_frame:
+                if energy:
+                    vax = vax - np.mean(vax)
+                    vp0 = vp0 - np.mean(vp0)
+                    vp1 = vp1 - np.mean(vp1)
+                else:
+                    print '~'*80
+                    print 'Shifting vax by ',np.mean(vax)
+                    vax = vax - np.mean(vax)
+
+            #self.vax = vax
+            #self.vp = np.sqrt(vp0**2+vp1**2)
+            #self.exb = exb
+            #self.bxexb = bxexb
             # This means field aligned is 0, perp is 90 and anti aligned is 180
-            pitch_angle = np.arctan(vax/np.sqrt(vp0**2+vp1**2))/np.pi*180. + 90. 
+            pitch_angle = -1.0*(np.arctan(vax/np.sqrt(vp0**2+vp1**2))/np.pi*180. - 90.)
+            self.ptc = pitch_angle
 
 # Not sure which of these two is right
             #pitch_angle = np.arccos(vpar/vmag)/np.pi*180.
@@ -439,32 +542,85 @@ class p3d_dump(object):
 
             subpartind = np.where(abs(pitch_angle - pa) < dpa/2.)
 
-            subpart = self.particles[species][subpartind]
-            self.subpart[species] = subpart
-            subpitch_angle = pitch_angle[subpartind] 
+            #subpart = self.particles[species][subpartind]
+            #self.subpart[species] = subpart
+            #subpitch_angle = pitch_angle[subpartind] 
 
-            print 'Total %s in pitch angle range are: %i'%(species,len(subpart))
+            #print 'Total %s in pitch angle range are: %i'%(species,len(subpart))
             return_hist_dict[species] = []
 
 #This is silly just do the whole distro right here
             if energy:
                 if species == 'e':
-                    KE = self.param_dict['m_e']/2.0*(self.particles[species]['vx']**2+
-                                                     self.particles[species]['vy']**2+
-                                                     self.particles[species]['vz']**2)
+                    reltv = True
+                    if reltv:
+                        #v2 = (self.particles[species]['vx']**2+
+                        #      self.particles[species]['vy']**2+
+                        #      self.particles[species]['vz']**2)
+
+                        v2 = vax**2 + vp0**2 + vp1**2
+
+                        KE = self.param_dict['m_e']* self.param_dict['c_2']*\
+                             (1./np.sqrt(1. - v2/self.param_dict['c_2']) - 1.)
+
+                    else:
+                        #KE = self.param_dict['m_e']/2.0*\
+                        #    (self.particles[species]['vx']**2+
+                        #     self.particles[species]['vy']**2+
+                        #     self.particles[species]['vz']**2)
+
+                        KE = self.param_dict['m_e']/2.0*\
+                             (vax**2 + vp0**2 + vp1**2)
+# Muck ===============
+#                   print 'More Mucking!!!'
+#                   KE = self.param_dict['m_e']/2.0*(v0**2+
+#                                                    v1**2+
+#                                                    v2**2)
+#                   
+# Muck ===============
                 else:
                     KE = 1.0/2.0*(self.particles[species]['vx']**2+
                                   self.particles[species]['vy']**2+
                                   self.particles[species]['vz']**2)
+# Muck ===============
+#                   print 'More Mucking!!!'
+#                   KE = 1./2.0*(v0**2+
+#                                v1**2+
+#                                v2**2)
+#                   
+# Muck ===============
                 #H,xedges = np.histogram(KE,**kwargs)
                 #return_hist_dict[species].append(H)
                 #return_hist_dict[species].append((xedges[:-1]+xedges[1:])/2.0)
 
-                self.KE = KE
-                self.pa = pitch_angle
 
-                H,xedges,yedges = np.histogram2d(KE,pitch_angle,**kwargs)
-                return_hist_dict[species].append(H)
+                print 'pa_size = ',np.size(pitch_angle)
+                print 'KE_size = ',np.size(KE)
+                H,xedges,yedges = np.histogram2d(pitch_angle,KE,**kwargs)
+                xx,yy = np.meshgrid(yedges,xedges)
+                eng = (xx[1:,1:]+xx[:-1,:-1])/2.
+                ynorm = (np.cos(yy[:-1,:-1]/180.*np.pi) - np.cos(yy[1:,1:]/180.*np.pi))
+                ynorm = ynorm/sum(ynorm)
+                if species == 'e':
+                    self.ynorm=ynorm
+                    self.pa = pitch_angle
+                    self.KE = KE
+                    self.eng = eng
+                    self.H = H
+                    self.yyy = yy
+
+# We need to account for a geometric factor because
+# E is basicly v^2, so we are binning circles?
+
+                #H = H/np.sqrt(eng)
+                #return_hist_dict[species].append(H/ynorm*eng**2.*np.size(pitch_angle))
+
+                Ebar = eng/self.param_dict['m_e']/self.param_dict['c_2']
+                rel_vel = np.sqrt((Ebar**2 + 2.*Ebar)/(Ebar**2 + 2.*Ebar + 1.))
+                rel_vel = rel_vel*np.sqrt(self.param_dict['c_2'])
+
+                return_hist_dict[species].append(H/ynorm*eng*rel_vel*np.size(pitch_angle))
+
                 return_hist_dict[species].append(xedges)
                 return_hist_dict[species].append(yedges)
 
@@ -472,22 +628,34 @@ class p3d_dump(object):
             else:
                 #Colby devide by bin size!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-                H, xedges, yedges = np.histogram2d(veloperp1,veloperp2,**kwargs)
+                H, xedges, yedges = np.histogram2d(vp0[subpartind],
+                                                   vp1[subpartind],
+                                                   **kwargs)
+# Muck ===============
+# Mucking!!!!!
+#                H = gaussian_filter(H, sigma=1.)
+# Muck ===============
 
-                int_cone = 1./18.*(
-                       (-xx[:-1,:-1]**3+6.*xx[:-1,:-1]*yy[:-1,:-1]*sqrt(xx[:-1,:-1]**2+yy[:-1,:-1]**2) + 
-                        3.*yy[:-1,:-1]**3*log(sqrt(xx[:-1,:-1]**2+yy[:-1,:-1]**2) + xx[:-1,:-1] + spacing(4)) + 
-                        3.*xx[:-1,:-1]**3*log(sqrt(xx[:-1,:-1]**2+yy[:-1,:-1]**2)+yy[:-1,:-1] + spacing(4))) -
-                       (-xx[1:,1:]**3+6.*xx[1:,1:]*yy[:-1,:-1]*sqrt(xx[1:,1:]**2+yy[:-1,:-1]**2) + 
-                        3.*yy[:-1,:-1]**3*log(sqrt(xx[1:,1:]**2+yy[:-1,:-1]**2) + xx[1:,1:] + spacing(4)) + 
-                        3.*xx[1:,1:]**3*log(sqrt(xx[1:,1:]**2+yy[:-1,:-1]**2)+yy[:-1,:-1] + spacing(4))) )-
-                       (-xx[:-1,:-1]**3+6.*xx[:-1,:-1]*yy[1:,1:]*sqrt(xx[:-1,:-1]**2+yy[1:,1:]**2) + 
-                        3.*yy[1:,1:]**3*log(sqrt(xx[:-1,:-1]**2+yy[1:,1:]**2) + xx[:-1,:-1] + spacing(4)) + 
-                        3.*xx[:-1,:-1]**3*log(sqrt(xx[:-1,:-1]**2+yy[1:,1:]**2)+yy[1:,1:] + spacing(4))) +
-                       (-xx[1:,1:]**3+6.*xx[1:,1:]*yy[1:,1:]*sqrt(xx[1:,1:]**2+yy[1:,1:]**2) + 
-                        3.*yy[1:,1:]**3*log(sqrt(xx[1:,1:]**2+yy[1:,1:]**2) + xx[1:,1:] + spacing(4)) + 
-                        3.*xx[1:,1:]**3*log(sqrt(xx[1:,1:]**2+yy[1:,1:]**2)+yy[1:,1:] + spacing(4))))
+                xx,yy = np.meshgrid(yedges,xedges)
+                print pa,dpa
 
+                #int_cone = 1./18.*(
+                self.inc = 1./18.*(
+                       (-xx[:-1,:-1]**3+6.*xx[:-1,:-1]*yy[:-1,:-1]*np.sqrt(xx[:-1,:-1]**2+yy[:-1,:-1]**2) + 
+                        3.*yy[:-1,:-1]**3*np.log(np.sqrt(xx[:-1,:-1]**2+yy[:-1,:-1]**2) + xx[:-1,:-1] + np.spacing(4)) + 
+                        3.*xx[:-1,:-1]**3*np.log(np.sqrt(xx[:-1,:-1]**2+yy[:-1,:-1]**2)+yy[:-1,:-1] + np.spacing(4))) -
+                       (-xx[1:,1:]**3+6.*xx[1:,1:]*yy[:-1,:-1]*np.sqrt(xx[1:,1:]**2+yy[:-1,:-1]**2) + 
+                        3.*yy[:-1,:-1]**3*np.log(np.sqrt(xx[1:,1:]**2+yy[:-1,:-1]**2) + xx[1:,1:] + np.spacing(4)) + 
+                        3.*xx[1:,1:]**3*np.log(np.sqrt(xx[1:,1:]**2+yy[:-1,:-1]**2)+yy[:-1,:-1] + np.spacing(4))) -
+                       (-xx[:-1,:-1]**3+6.*xx[:-1,:-1]*yy[1:,1:]*np.sqrt(xx[:-1,:-1]**2+yy[1:,1:]**2) + 
+                        3.*yy[1:,1:]**3*np.log(np.sqrt(xx[:-1,:-1]**2+yy[1:,1:]**2) + xx[:-1,:-1] + np.spacing(4)) + 
+                        3.*xx[:-1,:-1]**3*np.log(np.sqrt(xx[:-1,:-1]**2+yy[1:,1:]**2)+yy[1:,1:] + np.spacing(4))) +
+                       (-xx[1:,1:]**3+6.*xx[1:,1:]*yy[1:,1:]*np.sqrt(xx[1:,1:]**2+yy[1:,1:]**2) + 
+                        3.*yy[1:,1:]**3*np.log(np.sqrt(xx[1:,1:]**2+yy[1:,1:]**2) + xx[1:,1:] + np.spacing(4)) + 
+                        3.*xx[1:,1:]**3*np.log(np.sqrt(xx[1:,1:]**2+yy[1:,1:]**2)+yy[1:,1:] + np.spacing(4))))
+
+                self.inc = self._int_cone(pa,dpa,xedges,yedges)
+                #H = H/self.inc
                 H = np.rot90(H)
                 H = np.flipud(H)
                 return_hist_dict[species].append(H)
@@ -496,6 +664,168 @@ class p3d_dump(object):
 
 
         return return_hist_dict
+
+    def _vdist_pizza(self,
+                     par=False,
+                     z0=0.,
+                     dz=1.,
+                     wax=0,
+                     v0_frame=False,
+                     **kwargs): 
+        """ Pizza Party!!!
+            
+            Also I am sooo sory if you ever have to
+            use this code in this version... :(
+
+            A little help:
+            wax = which axis do we integarte over?
+            wax = (0,1,2) -> (x,y,z) 
+                or if in field line coordinates
+            wax = (0,1,2) -> (||, ExB, bxExB)
+
+        """
+
+        self._z0  = z0
+        self._dz  = dz
+        self._wax = wax
+
+        if par:
+            b_interp = np.array([ 
+                       self.interp_field(self.dump_field_dict['bx'],
+                                         self.param_dict['lx'],
+                                         self.param_dict['ly'],self._r0),
+                       self.interp_field(self.dump_field_dict['by'],
+                                         self.param_dict['lx'],
+                                         self.param_dict['ly'],self._r0),
+                       self.interp_field(self.dump_field_dict['bz'],
+                                         self.param_dict['lx'],
+                                         self.param_dict['ly'],self._r0)])
+
+            e_interp = np.array([ 
+                       self.interp_field(self.dump_field_dict['ex'],
+                                         self.param_dict['lx'],
+                                         self.param_dict['ly'],self._r0),
+                       self.interp_field(self.dump_field_dict['ey'],
+                                         self.param_dict['lx'],
+                                         self.param_dict['ly'],self._r0),
+                       self.interp_field(self.dump_field_dict['ez'],
+                                         self.param_dict['lx'],
+                                         self.param_dict['ly'],self._r0)])
+            # Mike wanted me to do it this way
+            fld = self.box_avg()
+
+            #print 'Frist the interp fields:'
+            #print 'B = ',b_interp
+            #print 'E = ',e_interp
+            b_interp = np.array([fld['bx'],fld['by'],fld['bz']])
+            e_interp = np.array([fld['ex'],fld['ey'],fld['ez']])
+
+            #print 'Then the avged fields:'
+            #print 'B = ',b_interp
+            #print 'E = ',e_interp
+
+            exb = np.cross(e_interp,b_interp)/sum(b_interp**2)
+            exb = exb/np.sqrt(sum(exb**2))
+
+            b_interp = b_interp/np.sqrt(sum(b_interp**2))
+
+            bxexb = np.cross(b_interp,exb) 
+            #print b_interp
+            #print exb
+            #print bxexb
+
+        velo={}
+        return_hist_dict = {}
+        self.subpart = {}
+        #print 'Mucking this up!!'
+        #Npart_2 = int(np.shape(self.particles['i']['vx'])[0]/2)
+
+        #self.particles['i']['vx'][:Npart_2] = 1.*np.random.normal(scale=1.0,size=Npart_2)
+        #self.particles['i']['vy'][:Npart_2] = 1.*np.random.normal(scale=1.0,size=Npart_2)
+        #self.particles['i']['vz'][:Npart_2] = 1.*np.random.normal(scale=1.0,size=Npart_2)
+
+        #self.particles['i']['vx'][Npart_2:] = 1.*np.random.normal(loc=10.,scale=1.0,size=Npart_2)
+        #self.particles['i']['vy'][Npart_2:] = 1.*np.random.normal(loc=4.,scale=1.0,size=Npart_2)
+        #self.particles['i']['vz'][Npart_2:] = 1.*np.random.normal(loc=4.,scale=1.0,size=Npart_2)
+        ##print 'Done Mucking this up!!!'
+        for species in self.species:
+            return_hist_dict[species] = []
+       
+            if par:
+# MuckMuckMuckMuck!!!!!
+#                vxxx = self.particles[species]['vx'] + 1.0
+# MuckMuckMuckMuck!!!!!
+
+                #v0 = (b_interp[0]*vxxx+
+                v0 = (b_interp[0]*self.particles[species]['vx']+
+                      b_interp[1]*self.particles[species]['vy']+
+                      b_interp[2]*self.particles[species]['vz'])
+
+                #v1 = (exb[0]*vxxx+
+                v1 = (exb[0]*self.particles[species]['vx']+
+                      exb[1]*self.particles[species]['vy']+
+                      exb[2]*self.particles[species]['vz'])
+
+                #v2 = (bxexb[0]*vxxx+
+                v2 = (bxexb[0]*self.particles[species]['vx']+
+                      bxexb[1]*self.particles[species]['vy']+
+                      bxexb[2]*self.particles[species]['vz'])
+#Light Debuging
+                self.bbb = b_interp
+                self.exb = exb
+                self.beb = bxexb
+                #print 'Mucking this up!!!'
+                #Npart = 100000
+                #v0 = 1.*np.random.normal(scale=3.0,size=Npart)
+                #v1 = 1.*np.random.normal(scale=1.0,size=Npart)
+                #v2 = 1.*np.random.normal(scale=1.0,size=Npart)
+            else:
+                v0 = self.particles[species]['vx']
+                v1 = self.particles[species]['vy']
+                v2 = self.particles[species]['vz']
+
+            if wax == 0: # wax is just which axis defines the plane we are looking at
+                vp0 = v1
+                vp1 = v2
+                vax = v0
+            elif wax == 1: 
+                vp0 = v2
+                vp1 = v0
+                vax = v1
+            elif wax == 2:
+                vp0 = v0
+                vp1 = v1
+                vax = v2
+            else :
+                print ''
+                print 'The plane axis is out of bounds fo wax = ',wax
+                print 'vdist_2d is crashing!!!!'
+                print ''
+
+            if v0_frame:
+                print '#'*80
+                print 'Shifting vax by ',np.mean(vax)
+                print '#'*80
+                vax = vax - np.mean(vax)
+
+            subpartind = np.where(abs(vax - z0) < dz/2.)
+            print ''
+            print 'The reduced number of {0} is {1}'.format(species,np.size(subpartind))
+            print ''
+
+            H, xedges, yedges = np.histogram2d(vp0[subpartind],vp1[subpartind],**kwargs)
+
+            H = np.rot90(H)
+            H = np.flipud(H)
+            return_hist_dict[species].append(H)
+            return_hist_dict[species].append(xedges)
+            return_hist_dict[species].append(yedges)
+
+
+        return return_hist_dict
+
+
+
 
     def _vdist_2d_par(self,**kwargs):
         """
@@ -639,23 +969,71 @@ class p3d_dump(object):
         return_hist_dict = {}
         return_hist_dict['i'] = []
         return_hist_dict['e'] = []
-      
-        for species in self.species:
-            H, xedges, yedges = np.histogram2d(self.particles[species]['vx'],self.particles[species]['vy'],**kwargs)
+        if kwargs.has_key('gen_vec'):
+            gvec = kwargs.pop('gen_vec')
+            vec1 = np.array(gvec[0])
+            vec2 = np.array(gvec[1])
+            vec1 = vec1/np.sqrt(np.sum(vec1**2))
+            vec2 = vec2/np.sqrt(np.sum(vec2**2))
+            if abs(np.dot(vec1,vec2)) > 10e-4:
+                print ''
+                print 'The two vectors given are not orthognal!!!!'
+                print 'The exception for handeling this has not been coded'
+                print 'kindly fix your shit and try again ~Colby'
+                print ''
+                return -1
+            else:
+                vec3 = np.cross(vec1,vec2)
+
+            velo = {}
+            for species in self.species:
+
+                velo[species] = {}
+
+                velo[species]['v1']   = (vec1[0]*self.particles[species]['vx']+
+                                         vec1[1]*self.particles[species]['vy']+
+                                         vec1[2]*self.particles[species]['vz'])
+
+                velo[species]['v2'] = (vec2[0]*self.particles[species]['vx']+
+                                       vec2[1]*self.particles[species]['vy']+
+                                       vec2[2]*self.particles[species]['vz'])
+
+                velo[species]['v3'] = (vec3[0]*self.particles[species]['vx']+
+                                       vec3[1]*self.particles[species]['vy']+
+                                       vec3[2]*self.particles[species]['vz'])
+
+                H, xedges, yedges = np.histogram2d(velo[species]['v1'],velo[species]['v2'],**kwargs)
 # H needs to be rotated and flipped
-            H = np.rot90(H)
-            H = np.flipud(H)
-            return_hist_dict[species].append(['V_X vs V_Y',H,xedges,yedges])
+                H = np.rot90(H)
+                H = np.flipud(H)
+                return_hist_dict[species].append(['V_1 vs V_2',H,xedges,yedges])
 
-            H, xedges, yedges = np.histogram2d(self.particles[species]['vx'],self.particles[species]['vz'],**kwargs)
-            H = np.rot90(H)
-            H = np.flipud(H)
-            return_hist_dict[species].append(['V_X vs V_Z',H,xedges,yedges])
+                H, xedges, yedges = np.histogram2d(velo[species]['v1'],velo[species]['v3'],**kwargs)
+                H = np.rot90(H)
+                H = np.flipud(H)
+                return_hist_dict[species].append(['V_1 vs V_3',H,xedges,yedges])
 
-            H, xedges, yedges = np.histogram2d(self.particles[species]['vy'],self.particles[species]['vz'],**kwargs)
-            H = np.rot90(H)
-            H = np.flipud(H)
-            return_hist_dict[species].append(['V_Y vs V_Z',H,xedges,yedges])
+                H, xedges, yedges = np.histogram2d(velo[species]['v2'],velo[species]['v3'],**kwargs)
+                H = np.rot90(H)
+                H = np.flipud(H)
+                return_hist_dict[species].append(['V_2 vs V_3',H,xedges,yedges])
+        else:
+            for species in self.species:
+                H, xedges, yedges = np.histogram2d(self.particles[species]['vx'],self.particles[species]['vy'],**kwargs)
+# H needs to be rotated and flipped
+                H = np.rot90(H)
+                H = np.flipud(H)
+                return_hist_dict[species].append(['V_X vs V_Y',H,xedges,yedges])
+
+                H, xedges, yedges = np.histogram2d(self.particles[species]['vx'],self.particles[species]['vz'],**kwargs)
+                H = np.rot90(H)
+                H = np.flipud(H)
+                return_hist_dict[species].append(['V_X vs V_Z',H,xedges,yedges])
+
+                H, xedges, yedges = np.histogram2d(self.particles[species]['vy'],self.particles[species]['vz'],**kwargs)
+                H = np.rot90(H)
+                H = np.flipud(H)
+                return_hist_dict[species].append(['V_Y vs V_Z',H,xedges,yedges])
 
 # Mask zeros
          #Hmasked = np.ma.masked_where(H==0,H)
@@ -665,19 +1043,27 @@ class p3d_dump(object):
     #def get_part_in_box([location, width]):
     def _part_in_box(self,r0=[0.5,0.5],dx=[1.,1.]):
         """
-        #---------------------------------------------------------------------------------------------------------------
+        #--------------------------------------------------------------
         #   Method      : get_part_in_box
         #
-        #   Discription : This method accepts a point and a width in simulation units (c/wpi) to define a box.
-        #               : In that box we bin all of the particles to form the effective distrobution function
+        #   Discription : This method accepts a point and a width in 
+        #                 simulation units (c/wpi) to define a box.
+        #               : In that box we bin all of the particles to 
+                          form the effective distrobution function
         #
-        #   Args        : location [x,y] ( where you want the center of you box to be located at)
-        #               : width [x,y] (the width of the box to bin particles 
-        #               : dump_num (This spesifies the particular runs dump file 
+        #   Args     r0 : location [x,y] ( where you want the center 
+                          of you box to be located at)
+        #            dx : width [x,y] (the width of the box to bin 
+                           particles 
+        #               : dump_num (This spesifies the particular 
+                          runs dump file 
         #
-        #   Comments    : It would be pretty easy and potential usefull to allow this to wrap around the edges
-        #               : so we can pick zero as a boundry and the code will know what todo.
-        #---------------------------------------------------------------------------------------------------------------
+        #   Comments    : It would be pretty easy and potential 
+                          usefull to allow this to wrap around 
+                          the edges
+        #               : so we can pick zero as a boundry and the 
+                          code will know what todo.
+                          #--------------------------------------------------------------
         """
         x0 = r0[0]
         y0 = r0[1]
@@ -847,10 +1233,116 @@ class p3d_dump(object):
             else:
                 return '00'+str(num)
 
+    def _int_cone(self,pa,dpa,xedges,yedges):
+        """
+#---------------------------------------------------------------------------------------------------------------
+#   Method      : _int_cone
+#
+#   Discription : This integrates a cone over a differental grid
+#
+#   Args        : xedges the x edges of the histogram
+#               : yedges the y edges of the histogram
+#
+#   Comments    : I think this is working ok? 
+#---------------------------------------------------------------------------------------------------------------
+        """
+        
+
+        xx,yy = np.meshgrid(yedges,xedges)
+        intcone = 1./18.*(
+               (-xx[:-1,:-1]**3+6.*xx[:-1,:-1]*yy[:-1,:-1]*np.sqrt(xx[:-1,:-1]**2+yy[:-1,:-1]**2) + 
+                3.*yy[:-1,:-1]**3*np.log(np.sqrt(xx[:-1,:-1]**2+yy[:-1,:-1]**2) + xx[:-1,:-1] + np.spacing(4)) + 
+                3.*xx[:-1,:-1]**3*np.log(np.sqrt(xx[:-1,:-1]**2+yy[:-1,:-1]**2)+yy[:-1,:-1] + np.spacing(4))) -
+               (-xx[1:,1:]**3+6.*xx[1:,1:]*yy[:-1,:-1]*np.sqrt(xx[1:,1:]**2+yy[:-1,:-1]**2) + 
+                3.*yy[:-1,:-1]**3*np.log(np.sqrt(xx[1:,1:]**2+yy[:-1,:-1]**2) + xx[1:,1:] + np.spacing(4)) + 
+                3.*xx[1:,1:]**3*np.log(np.sqrt(xx[1:,1:]**2+yy[:-1,:-1]**2)+yy[:-1,:-1] + np.spacing(4))) -
+               (-xx[:-1,:-1]**3+6.*xx[:-1,:-1]*yy[1:,1:]*np.sqrt(xx[:-1,:-1]**2+yy[1:,1:]**2) + 
+                3.*yy[1:,1:]**3*np.log(np.sqrt(xx[:-1,:-1]**2+yy[1:,1:]**2) + xx[:-1,:-1] + np.spacing(4)) + 
+                3.*xx[:-1,:-1]**3*np.log(np.sqrt(xx[:-1,:-1]**2+yy[1:,1:]**2)+yy[1:,1:] + np.spacing(4))) +
+               (-xx[1:,1:]**3+6.*xx[1:,1:]*yy[1:,1:]*np.sqrt(xx[1:,1:]**2+yy[1:,1:]**2) + 
+                3.*yy[1:,1:]**3*np.log(np.sqrt(xx[1:,1:]**2+yy[1:,1:]**2) + xx[1:,1:] + np.spacing(4)) + 
+                3.*xx[1:,1:]**3*np.log(np.sqrt(xx[1:,1:]**2+yy[1:,1:]**2)+yy[1:,1:] + np.spacing(4))))
+
+        norm = 1./18.*(
+               (-xx[0,0]**3+6.*xx[0,0]*yy[0,0]*np.sqrt(xx[0,0]**2+yy[0,0]**2) + 
+                3.*yy[0,0]**3*np.log(np.sqrt(xx[0,0]**2+yy[0,0]**2) + xx[0,0] + np.spacing(4)) + 
+                3.*xx[0,0]**3*np.log(np.sqrt(xx[0,0]**2+yy[0,0]**2)+yy[0,0] + np.spacing(4))) -
+               (-xx[-1,-1]**3+6.*xx[-1,-1]*yy[0,0]*np.sqrt(xx[-1,-1]**2+yy[0,0]**2) + 
+                3.*yy[0,0]**3*np.log(np.sqrt(xx[-1,-1]**2+yy[0,0]**2) + xx[-1,-1] + np.spacing(4)) + 
+                3.*xx[-1,-1]**3*np.log(np.sqrt(xx[-1,-1]**2+yy[0,0]**2)+yy[0,0] + np.spacing(4))) -
+               (-xx[0,0]**3+6.*xx[0,0]*yy[-1,-1]*np.sqrt(xx[0,0]**2+yy[-1,-1]**2) + 
+                3.*yy[-1,-1]**3*np.log(np.sqrt(xx[0,0]**2+yy[-1,-1]**2) + xx[0,0] + np.spacing(4)) + 
+                3.*xx[0,0]**3*np.log(np.sqrt(xx[0,0]**2+yy[-1,-1]**2)+yy[-1,-1] + np.spacing(4))) +
+               (-xx[-1,-1]**3+6.*xx[-1,-1]*yy[-1,-1]*np.sqrt(xx[-1,-1]**2+yy[-1,-1]**2) + 
+                3.*yy[-1,-1]**3*np.log(np.sqrt(xx[-1,-1]**2+yy[-1,-1]**2) + xx[-1,-1] + np.spacing(4)) + 
+                3.*xx[-1,-1]**3*np.log(np.sqrt(xx[-1,-1]**2+yy[-1,-1]**2)+yy[-1,-1] + np.spacing(4))))
+        
+        self.normie=norm
+
+        print 'norm = ',norm
+        print 'otha = ',abs(1./np.tan((pa-dpa/2.)/180.*np.pi) - 1./np.tan((pa+dpa/2.)/180.*np.pi))
+
+        #return intcone/norm#*abs(1./np.tan((pa-dpa/2.)/180.*np.pi) - 1./np.tan((pa+dpa/2.)/180.*np.pi))
+        return intcone/intcone.min()#*abs(1./np.tan((pa-dpa/2.)/180.*np.pi) - 1./np.tan((pa+dpa/2.)/180.*np.pi))
+
+# Ripped this code from else where nee to add it
+    def box_avg(self):
+        
+        if not hasattr(self, 'dump_field_dict'):
+            print 'Field data not loaded somthings wrong!!!!'
+            return None
+        
+        r0 = self._r0
+        dx = self._dx
+
+        x0 = r0[0] - dx[0]/2.
+        x1 = r0[0] + dx[0]/2.
+        y0 = r0[1] - dx[1]/2.
+        y1 = r0[1] + dx[1]/2.
+
+        dx0 = 1.0*self.param_dict['lx']/(self.param_dict['nx']*self.param_dict['pex'])
+
+        ip0 = int(np.ceil((x0 -  dx0/2.)/dx0))
+        ip1 = int(np.floor((x1 - dx0/2.)/dx0))
+        jp0 = int(np.ceil((y0 -  dx0/2.)/dx0))
+        jp1 = int(np.floor((y1 - dx0/2.)/dx0))
+
+        if ip1 < ip0 or jp1 < jp0:
+            print 'No grid points found in box!!!!'
+            return None
+        #else:
+        #    print 'DEBUG: ',ip0,ip1,jp0,jp1
+       
+        iprg, jprg = [],[]
+        for c in range(ip0,ip1+1):
+            for d in range(jp0,jp1+1):
+                iprg.append(c)
+                jprg.append(d)
+
+        avg_flds = {}
+        for k,fld in self.dump_field_dict.iteritems():
+            avg_flds[k] = np.mean(fld[jprg,iprg])
+
+        return avg_flds
+
+
+    def _shift_frame(self):
+        """ Shifts all the particles velocties into their fluid frame.
+            This finds the mean ux uy and uz for e and i and shifts everying
+            by thoes values
+        """
+
+        for s in self.species:
+            for c in ['vx','vy','vz']:
+                uu = np.mean(self.particles[s][c])
+                print '{0}_{1} = {2}'.format(c,s,uu)
+                self.particles[s][c] = self.particles[s][c] - uu
+
 
     def interp_field(self,field,lx=None,ly=None,r0=None):
         """
-#---------------------------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------
+#        
 #   Method      : interp_field
 #
 #   Discription : This method takes a field and a floating point, and returns the linear fit value 
@@ -860,9 +1352,10 @@ class p3d_dump(object):
 #               : r0[0] The xpoint to interpolate at
 #               : r0[1] The ypoint to interpolate at
 #
-#   Comments    : I think this is working ok? It would be smart to make this an object method that just reads
+#   Comments    : I think this is working ok? It would be smart to make
+#                 this an object method that just reads
 #               : the internally saved field. so CODE IN THE FUTURE
-#---------------------------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------
         """
         if lx is None:lx=self.param_dict['lx']
         if ly is None:ly=self.param_dict['ly']
@@ -879,14 +1372,14 @@ class p3d_dump(object):
         if jp + 1 > ny-1: jpp1 = 0
         else: jpp1 = jp+1
 
-        print ip,jp,nx,ny
+       # print ip,jp,nx,ny
 
         wx = 1.0*r0[0]/lx*nx - np.floor(1.0*r0[0]/lx*nx)
         wy = 1.0*r0[1]/ly*ny - np.floor(1.0*r0[1]/ly*ny)
 
-        return (1.-wx)*(1.-wy)*field[jp,ip]   +\
-               (wx)   *(1.-wy)*field[jpp1,ip] +\
-               (1.-wx)*   (wy)*field[jp,ipp1] +\
+        return (1.-wx)*(1.-wy)*field[jp  , ip]+\
+               (wx)   *(1.-wy)*field[jpp1, ip]+\
+               (1.-wx)*   (wy)*field[jp  ,ipp1]+\
                (wx)   *   (wy)*field[jpp1,ipp1]
     
 

@@ -20,6 +20,7 @@ import datetime
 import numpy as np
 import struct
 import glob
+import pdb
 from scipy.io.idl import readsav
 
 class p3d_movie(object):
@@ -79,19 +80,31 @@ class p3d_movie(object):
 
 
         #Set moive.log path
+        if 'four_byte' not in self.param_dict: #single byte precision
+            fname = self.movie_path+'/movie.log.'+self.movie_num_str
+            fname = os.path.abspath(fname)
+            print "Loading movie.log file '%s'"%fname
+            #Read moive.log
+            movie_log_arr = np.loadtxt(fname) 
+            self.num_of_times = len(movie_log_arr)/len(self.movie_arr)
+            print "movie.log '%s' has %i time slices"%(fname,self.num_of_times)
+            
+            for n in range(len(self.movie_arr)):
+                self.movie_log_dict[self.movie_arr[n]] = []
+            for n in range(len(movie_log_arr)):
+                self.movie_log_dict[self.movie_arr[n%len(self.movie_arr)]].append(movie_log_arr[n,:]) 
 
-        fname = self.movie_path+'/movie.log.'+self.movie_num_str
-        fname = os.path.abspath(fname)
-        print "Loading movie.log file '%s'"%fname
-        #Read moive.log
-        movie_log_arr = np.loadtxt(fname) 
-        self.num_of_times = len(movie_log_arr)/len(self.movie_arr)
-        print "movie.log '%s' has %i time slices"%(fname,self.num_of_times)
-        
-        for n in range(len(self.movie_arr)):
-            self.movie_log_dict[self.movie_arr[n]] = []
-        for n in range(len(movie_log_arr)):
-            self.movie_log_dict[self.movie_arr[n%len(self.movie_arr)]].append(movie_log_arr[n,:]) 
+        else:
+            fname = self.movie_path+'/movie.bz.'+self.movie_num_str
+            nex = self.param_dict['pex']*self.param_dict['nx']
+            ney = self.param_dict['pey']*self.param_dict['ny']
+
+            print  os.path.getsize(fname)/4/nex/ney
+            self.num_of_times = os.path.getsize(fname)/4/nex/ney
+            for k in self.movie_arr:
+                self.movie_log_dict[k] = [np.array([0.,1.]) for c in 
+                                          range(self.num_of_times)]
+
 
 # STRUCTURE OF movie_log_dict{}
 #   movie_log_dict is a dictionary of all the of the varibles that could be read in a movie file
@@ -110,7 +123,7 @@ class p3d_movie(object):
 #       information in the run_list.dat file.
 #---------------------------------------------------------------------------------------------------------------
     #def load_movie(self,movie_num,movie_var,movie_time):
-    def load_movie(self,var='NOT_SET',time=-1,local=False):
+    def load_movie(self,var='NOT_SET',time=None,local=False):
         """ A method to load a particular value for a given time 
 
         Load movie files for a given set of varibles.
@@ -138,81 +151,90 @@ class p3d_movie(object):
                 print 'Varable %s not found in movie_arr. Nothing was loaded!'%cosa
                 print 'You dont get a second try!'
                 return -1
-            if (time < 0 or time > self.num_of_times - 1):
-                print 'Time %s out of range. [0,%i]'%(time,self.num_of_times-1)
-                time = int(raw_input('Please Enter a time: '))
-            if (time < 0 or time > (self.num_of_times - 1)):
-                print 'Time %s out of range. [0,%i]'%(time,self.num_of_times-1)
-                print 'You dont get a second try!'
-                return -1
+            
+            if time is None:
+                time = raw_input('Time %s out of range [0 - %i]\n'% \
+                                 (time,self.num_of_times-1) + \
+                                 'Please Enter a time: ')
+
+            if time == 'all':
+                time = range(self.num_of_times)
+            elif type(time) is str:
+                time = [int(x) for x in time.split()]
+            elif type(time) is int:
+                time = [time]
+            else:
+                time = list(time)
+
+            for chose in time:
+                if -1 < chose < self.num_of_times:
+                    pass
+                else:
+                    print 'Time %i is out of time range [%i - %i]'\
+                          %(chose,0,self.num_of_times-1)
+                    return None
                 
             fname = self.movie_path+'/movie.'+cosa+'.'+self.movie_num_str
             fname = os.path.abspath(fname)
-            print "Loading movie.log file '%s'"%fname
 
             nex = self.param_dict['pex']*self.param_dict['nx']
             ney = self.param_dict['pey']*self.param_dict['ny']
 
+            
             #NOTE: we are reading the whole movie file in one shot!
             # this seems wastefull
-            print "Restoring Varible '"+cosa+"' From File '"+fname+"'"
+            #print "Restoring Varible '%s' From File '%s'"%(cosa,fname)
+            print "Loading '%s'"%(cosa)
 
+# It seems that Marc Swisdak hates us and wants
+# to be unhappy because the byte data is unsigned
+# and the doulbe byte is signed so that is why
+# one has a uint and the other is just int
             if 'double_byte' in self.param_dict:
-                dat_type = 'uint16'
+                dat_type = np.dtype('int16')
                 norm_cst = 256**2-1
+                shft_cst = 1.0*256**2/2
+            elif 'four_byte' in self.param_dict: #single byte precision
+                dat_type = np.dtype('float32')
+                norm_cst = 1.
+                shft_cst = 0.
             else: #single byte precision
                 #dat_type = 'int8'
-                dat_type = 'uint8'
+                dat_type = np.dtype('uint8')
                 norm_cst = 256-1
+                shft_cst = 0.0 
 
-            print 'dat_type = ',dat_type
-
-            fp = np.memmap(fname, dtype=dat_type, mode='r',shape=(self.num_of_times,ney,nex)) 
-            self.debut_temp0 = fp
-            byte_arr = np.frombuffer(fp[time],dtype=dat_type)
-            # converting into a float
-            self.debug_temp1 = byte_arr
-            #byte_arr = 1.0*byte_arr.reshape(ney,nex).transpose()
-# I am temporarlly removeing the transpose call so that it is more like the IDL restore stuff
-            byte_arr = 1.0*byte_arr.reshape(ney,nex)
-
-            self.debug_temp2 = byte_arr
-# This seems to be working but we need to generalize for any file
-# Also It would be good to have some kinda of print out talkting about
-# How many movies there are and all that non sence.
             
-#This is just doing it for the first time step, we can generlize later
             lmin = np.array(self.movie_log_dict[cosa])[:,0]
             lmax = np.array(self.movie_log_dict[cosa])[:,1]
+            self.lmm = (lmin,lmax)
+            byte_arr = np.empty((np.size(time),ney,nex))
+            #print 'dat_type = ',dat_type
+            grid_pts = ney*nex
+            with open(fname,'r') as f: 
+                for c,chose in enumerate(time):
 
-            self.debug_temp3 = [lmin,lmax]
-            #byte_ip1 = movie_time*arr_size[0]*arr_size[1]
-            #byte_ip2 = byte_ip1 + arr_size[0]*arr_size[1]
+                    f.seek(chose*grid_pts*dat_type.itemsize, 0)
+                    byte_arr[c,:,:] = np.fromfile(f, 
+                                                  dtype=dat_type,
+                                                  count=grid_pts
+                                                  ).reshape(ney,nex)
+    
+                    byte_arr[c,:,:] = (1.0*byte_arr[c,:,:] + shft_cst)* \
+                                      (lmax[chose]-lmin[chose]) \
+                                      /(1.0*norm_cst) + lmin[chose]
 
-            #print 'There are '+str(len(byte_movie)/arr_size[0]/arr_size[1])+ \
-            #' movie files and you loaded number ' +str(movie_time+1)
+            return_dict[cosa] = np.squeeze(byte_arr)
 
-            return_dict[cosa] = 1.0*byte_arr*(lmax[time]-lmin[time])/norm_cst + 1.0*lmin[time]
-
-
-        #return real_arr_1.reshape(arr_size[1],arr_size[0])
-        #return np.transpose(return_arr)
-        #return return_arr
-        if np.size(return_dict.keys()) == 1:
-            return return_dict[return_dict.keys()[0]]
-        elif np.size(return_dict.keys()) > 1: 
-            (return_dict['xx'],return_dict['yy']) = self.get_domain_arrays()
-            return return_dict
-        else:
-            print 'I dont know why the return_dict in this method (load_movie) is empty?'
-            return -1
-        #return byte_arr
+        return_dict.update(zip(('xx','yy'), self.get_domain_arrays()))
+        return return_dict
         
 
     def _movie_num_options(self):
-        choices = glob.glob(self.movie_path+'/movie.log.*')
+        choices = glob.glob(self.movie_path+'/movie.bz.*')
         if len(choices) == 0: 
-            print '!!! WARNING: the direcotry we are looking in does not have any moive.log.XXX so we are crashing'
+            print '!!! WARNING: the direcotry we are looking in does not'\
+                  ' have any moive.bz.XXX so we are crashing'
             return -1
         for var in range(np.size(choices)):
             choices[var] = choices[var][-3:]
@@ -234,6 +256,15 @@ class p3d_movie(object):
                               'pexx','peyy','pezz','pexy','peyz','pexz',
                               'ni',
                               'pixx','piyy','pizz','pixy','piyz','pixz']
+        elif self.param_dict['movie_header'] == '"movie4b.h"':
+            self.movie_arr = ['rho',
+                              'jx','jy','jz',
+                              'bx','by','bz',
+                              'ex','ey','ez',
+                              'ne','jex','jey','jez',
+                              'pexx','peyy','pezz','pexz','peyz','pexy',
+                              'ni','jix','jiy','jiz',
+                              'pixx','piyy','pizz' 'pixz','piyz','pixy']
         elif self.param_dict['movie_header'] == '"movie2dD.h"':
             self.movie_arr = ['rho',
                               'jx','jy','jz',
