@@ -5,10 +5,11 @@ from sub import calc_psi
 
 # Assume Movie Dat has been loaded
 # and is called CR
-#CR = load('./reconn922_U.npz')['CR'].all()
 
 # Calc extra variables
 def make_pat_plot(CR,fname=None):
+
+    plt.ioff()
     _CR = dict(CR)
     for k in _CR.keys():
         if len(k) > 2 and k.rfind('av') > 0: 
@@ -59,18 +60,20 @@ def make_pat_plot(CR,fname=None):
                     'gist_heat','gist_heat',
                     'gist_heat','gist_heat'])
 # Page #4
-    vars_2D.append(['vipar','vepar',
-                    'viperp','veperp',
+#    vars_2D.append(['vipar','vepar', # This was the old set up
+#                    'viperp','veperp',
+    vars_2D.append(['tipar','tepar',
+                    'tiperp1','teperp1',
+                    'viperp','vepar',
                     'exbx','exby',
                     'exbz','|exb|',
-                    'epar', 'jpar',
-                    'phin', 'phit'])
-    pg_cmap.append(['bwr','bwr',
+                    'epar', 'jpar'])
+    pg_cmap.append(['gist_heat','gist_heat',
+                    'gist_heat','gist_heat',
                     'bwr','bwr',
                     'bwr','bwr',
                     'bwr','gist_heat',
-                    'bwr','bwr',
-                    'gist_heat','gist_heat'])
+                    'bwr','bwr'])
 
 # This is bascily the dict that that coresponds to each location 
 # of the 1D cuts
@@ -97,13 +100,16 @@ def make_pat_plot(CR,fname=None):
             print 'Plotting pg%i...'%(pg)
             fig,axs = set_fig()
             for ax,v,cmap in zip(axs,dvar,cmaps):
-                plot_2D(ax, _CR, v,
-                        cmap=cmap,
-                        psi_lvls=psi_lvls,
-                        cut_locs=cut_locs)
+                _ = plot_2D(ax, _CR, v,
+                            cmap=cmap,
+                            psi_lvls=psi_lvls,
+                            cut_locs=cut_locs)
+
+                if cmap is 'bwr':
+                    imax = np.max(np.abs(np.array(_[0].get_clim())))
+                    _[0].set_clim(-1.*imax,imax)
 
             close_fig(pdf)
-            #sys.exit()
 
 # Now 1D plots
         for loc in cut_locs:

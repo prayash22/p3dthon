@@ -80,19 +80,31 @@ class p3d_movie(object):
 
 
         #Set moive.log path
+        if 'four_byte' not in self.param_dict: #single byte precision
+            fname = self.movie_path+'/movie.log.'+self.movie_num_str
+            fname = os.path.abspath(fname)
+            print "Loading movie.log file '%s'"%fname
+            #Read moive.log
+            movie_log_arr = np.loadtxt(fname) 
+            self.num_of_times = len(movie_log_arr)/len(self.movie_arr)
+            print "movie.log '%s' has %i time slices"%(fname,self.num_of_times)
+            
+            for n in range(len(self.movie_arr)):
+                self.movie_log_dict[self.movie_arr[n]] = []
+            for n in range(len(movie_log_arr)):
+                self.movie_log_dict[self.movie_arr[n%len(self.movie_arr)]].append(movie_log_arr[n,:]) 
 
-        fname = self.movie_path+'/movie.log.'+self.movie_num_str
-        fname = os.path.abspath(fname)
-        print "Loading movie.log file '%s'"%fname
-        #Read moive.log
-        movie_log_arr = np.loadtxt(fname) 
-        self.num_of_times = len(movie_log_arr)/len(self.movie_arr)
-        print "movie.log '%s' has %i time slices"%(fname,self.num_of_times)
-        
-        for n in range(len(self.movie_arr)):
-            self.movie_log_dict[self.movie_arr[n]] = []
-        for n in range(len(movie_log_arr)):
-            self.movie_log_dict[self.movie_arr[n%len(self.movie_arr)]].append(movie_log_arr[n,:]) 
+        else:
+            fname = self.movie_path+'/movie.bz.'+self.movie_num_str
+            nex = self.param_dict['pex']*self.param_dict['nx']
+            ney = self.param_dict['pey']*self.param_dict['ny']
+
+            print  os.path.getsize(fname)/4/nex/ney
+            self.num_of_times = os.path.getsize(fname)/4/nex/ney
+            for k in self.movie_arr:
+                self.movie_log_dict[k] = [np.array([0.,1.]) for c in 
+                                          range(self.num_of_times)]
+
 
 # STRUCTURE OF movie_log_dict{}
 #   movie_log_dict is a dictionary of all the of the varibles that could be read in a movie file
@@ -147,7 +159,7 @@ class p3d_movie(object):
 
             if time == 'all':
                 time = range(self.num_of_times)
-            elif type(time) == str:
+            elif type(time) is str:
                 time = [int(x) for x in time.split()]
             elif type(time) is int:
                 time = [time]
@@ -168,6 +180,7 @@ class p3d_movie(object):
             nex = self.param_dict['pex']*self.param_dict['nx']
             ney = self.param_dict['pey']*self.param_dict['ny']
 
+            
             #NOTE: we are reading the whole movie file in one shot!
             # this seems wastefull
             #print "Restoring Varible '%s' From File '%s'"%(cosa,fname)
@@ -178,15 +191,20 @@ class p3d_movie(object):
 # and the doulbe byte is signed so that is why
 # one has a uint and the other is just int
             if 'double_byte' in self.param_dict:
-                dat_type = np.dtype('uint16')
+                dat_type = np.dtype('int16')
                 norm_cst = 256**2-1
+                shft_cst = 1.0*256**2/2
+            elif 'four_byte' in self.param_dict: #single byte precision
+                dat_type = np.dtype('float32')
+                norm_cst = 1.
+                shft_cst = 0.
             else: #single byte precision
                 #dat_type = 'int8'
                 dat_type = np.dtype('uint8')
                 norm_cst = 256-1
+                shft_cst = 0.0 
 
             
-            _ = 0 # This keeps track of where we are
             lmin = np.array(self.movie_log_dict[cosa])[:,0]
             lmax = np.array(self.movie_log_dict[cosa])[:,1]
             self.lmm = (lmin,lmax)
@@ -194,18 +212,17 @@ class p3d_movie(object):
             #print 'dat_type = ',dat_type
             grid_pts = ney*nex
             with open(fname,'r') as f: 
-                for i,chose in enumerate(time):
-                    f.seek((chose - _)*grid_pts*dat_type.itemsize, os.SEEK_SET)
-                    byte_arr[i,:,:] = np.fromfile(f, 
+                for c,chose in enumerate(time):
+
+                    f.seek(chose*grid_pts*dat_type.itemsize, 0)
+                    byte_arr[c,:,:] = np.fromfile(f, 
                                                   dtype=dat_type,
                                                   count=grid_pts
                                                   ).reshape(ney,nex)
     
-                    byte_arr[i,:,:] = 1.0*byte_arr[i,:,:]* \
+                    byte_arr[c,:,:] = (1.0*byte_arr[c,:,:] + shft_cst)* \
                                       (lmax[chose]-lmin[chose]) \
-                                      /norm_cst + 1.0*lmin[chose]
-
-                    _ = chose + 1
+                                      /(1.0*norm_cst) + lmin[chose]
 
             return_dict[cosa] = np.squeeze(byte_arr)
 
@@ -214,9 +231,10 @@ class p3d_movie(object):
         
 
     def _movie_num_options(self):
-        choices = glob.glob(self.movie_path+'/movie.log.*')
+        choices = glob.glob(self.movie_path+'/movie.bz.*')
         if len(choices) == 0: 
-            print '!!! WARNING: the direcotry we are looking in does not have any moive.log.XXX so we are crashing'
+            print '!!! WARNING: the direcotry we are looking in does not'\
+                  ' have any moive.bz.XXX so we are crashing'
             return -1
         for var in range(np.size(choices)):
             choices[var] = choices[var][-3:]
