@@ -52,23 +52,37 @@ def plot_2D(ax,CR,var,
     im = ax.imshow(var,extent=ext,origin='low',**kwargs)
     
     if type(extent) is not str:
+        print 'hello????'
         ax.set_xlim(extent[:2])
         ax.set_ylim(extent[2:])
+        ip1 = int(round((extent[0]-CR['xx'][0])/(CR['xx'][1] - CR['xx'][0])))
+        ip2 = int(round((extent[1]-CR['xx'][0])/(CR['xx'][1] - CR['xx'][0])))
+        jp1 = int(round((extent[2]-CR['yy'][0])/(CR['yy'][1] - CR['yy'][0])))
+        jp2 = int(round((extent[3]-CR['yy'][0])/(CR['yy'][1] - CR['yy'][0])))
+        print 'clim was: ',im.get_clim()
+        im.set_clim(var[jp1:jp2,ip1:ip2].min(),var[jp1:jp2,ip1:ip2].max())
+        print 'clim is : ',im.get_clim()
+
+
+# Fix the clim stuff here
+
     ax.autoscale(False)
     
-    ax.set_xlabel(r'$X (d_i)$',size=8)
-    ax.set_ylabel(r'$Y (d_i)$',size=8)
+    ax.set_xlabel(r'$X\ (d_i)$',size=8)
+    ax.set_ylabel(r'$Y\ (d_i)$',size=8)
     ax.set_title(title+': %1.3f, %1.3f'%(var.min(),var.max()),size=8)
-
-    ax.xaxis.set_tick_params(which='both',labelsize=8)
-    ax.yaxis.set_tick_params(which='both',labelsize=8)
+    
+    lsz = 6
+    ax.xaxis.set_tick_params(which='both',labelsize=lsz)
+    ax.yaxis.set_tick_params(which='both',labelsize=lsz)
 
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", "3%", pad="1.5%")
     plt.colorbar(im, cax=cax)
 
-    cax.xaxis.set_tick_params(which='both',labelsize=8)
-    cax.yaxis.set_tick_params(which='both',labelsize=8)
+    lsz = 6
+    cax.xaxis.set_tick_params(which='both',labelsize=lsz)
+    cax.yaxis.set_tick_params(which='both',labelsize=lsz)
     plt.sca(ax)
     plt.minorticks_on()
 
@@ -99,7 +113,8 @@ def plot_1D(ax,CR,var,
 
     lgargs = kwargs.pop('lgargs',None)
     no_lines = kwargs.pop('no_lines',False)
-    c_itter = ['r','b','g','k']
+    c_itter = kwargs.pop('c_itter',['r','b','g','k'])
+
     if dir == 'y':
 
         ip = abs(CR['xx'] - loc).argmin()
@@ -138,9 +153,9 @@ def plot_1D(ax,CR,var,
             ax.set_xlim(CR['yy'][[0,-1]])
         else:
             ax.set_xlim(CR['xx'][[0,-1]])
-
-    ax.xaxis.set_tick_params(which='both',labelsize=8)
-    ax.yaxis.set_tick_params(which='both',labelsize=8)
+    lsz = 6
+    ax.xaxis.set_tick_params(which='both',labelsize=lsz)
+    ax.yaxis.set_tick_params(which='both',labelsize=lsz)
     ax.set_title('cut @ x = %1.2f'%loc,size=8,loc='right')
 
     ax.autoscale(False)
@@ -151,8 +166,12 @@ def plot_1D(ax,CR,var,
         for offset in vcuts:
             draw_line(ax,cut='y',offset=offset)
     else:
+# Draw line at mind plane
+        xmp = CR['yy'][abs(CR['bxav'][:,ip]).argmin()]
         draw_line(ax,cut='x',offset=0.)
-        draw_line(ax,cut='y',offset=0.)
+        draw_line(ax,cut='y',offset=xmp)
+# or just draw it at the new 0
+        #draw_line(ax,cut='y',offset=0.)
 
     plt.sca(ax)
     plt.minorticks_on()
@@ -167,10 +186,10 @@ def draw_line(ax,cut='x',offset=0.):
     bgarr = np.array([-10000,10000])
 
     if cut == 'x':
-        ax.plot(bgarr, np.zeros(2)+offset, 'k--')
+        ax.plot(bgarr, np.zeros(2)+offset, 'k--',linewidth=.6)
 
     elif cut == 'y':
-        ax.plot(np.zeros(2)+offset, bgarr, 'k--')
+        ax.plot(np.zeros(2)+offset, bgarr, 'k--',linewidth=.6)
 
     else: print 'What?'
         

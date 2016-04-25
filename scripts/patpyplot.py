@@ -9,6 +9,7 @@ from sub import calc_psi
 # Calc extra variables
 def make_pat_plot(CR,fname=None):
 
+    plt.ioff()
     _CR = dict(CR)
     for k in _CR.keys():
         if len(k) > 2 and k.rfind('av') > 0: 
@@ -99,10 +100,14 @@ def make_pat_plot(CR,fname=None):
             print 'Plotting pg%i...'%(pg)
             fig,axs = set_fig()
             for ax,v,cmap in zip(axs,dvar,cmaps):
-                plot_2D(ax, _CR, v,
-                        cmap=cmap,
-                        psi_lvls=psi_lvls,
-                        cut_locs=cut_locs)
+                _ = plot_2D(ax, _CR, v,
+                            cmap=cmap,
+                            psi_lvls=psi_lvls,
+                            cut_locs=cut_locs)
+
+                if cmap is 'bwr':
+                    imax = np.max(np.abs(np.array(_[0].get_clim())))
+                    _[0].set_clim(-1.*imax,imax)
 
             close_fig(pdf)
 
