@@ -82,7 +82,7 @@ class TPRun:
         # keep the user values for plotting etc.
 
         #TODO attention si loading==user
-        # r0,v0 sont des tableaux et dr0,dv0 
+        # r0,v0 sont des tableaux et dr0,dv0
         # ne doivent pas etre utilises !
         #- 2013-05-20 08:06:57.972466
         self._r0u       = r0
@@ -98,7 +98,7 @@ class TPRun:
         self._nt        = int((tend-tstart)/dt) + 1
 
 
-        # checks the time interval is well defined 
+        # checks the time interval is well defined
         #----------------------------------------------------------------------
         if t0 < self.tstart or t0 > self.tend:
             print 'time (%5.3f) should be between tstart(%5.3f)\
@@ -224,7 +224,7 @@ class TPRun:
 
         @return: @todo
 
-        Exemple  : 
+        Exemple  :
 
         Creation : 2013-05-01 14:28:08.724842
 
@@ -261,7 +261,7 @@ class TPRun:
     def _moveall(self):
         """move all particles backward and forward as necessary
 
-        Exemple  : 
+        Exemple  :
 
         Creation : 2013-05-04 15:40:32.257893
 
@@ -289,10 +289,10 @@ class TPRun:
         #c# xc = self._run.GetCoord(axis=0)
         #c# yc = self._run.GetCoord(axis=1)
 
-        xc = self._CR['xx'][0]
-        yc = self._CR['yy'][0]
         self._dx = self._CR['xx'][1] - self._CR['xx'][0]
         self._dy = self._CR['yy'][1] - self._CR['yy'][0]
+        xc = self._CR['xx'][0] - .5*self._dx # Giving us guard cells
+        yc = self._CR['yy'][0] - .5*self._dy
 
         func(self.r,
              self.v,
@@ -343,10 +343,10 @@ class TPRun:
 
         self._dx = self._CR['xx'][1] - self._CR['xx'][0]
         self._dy = self._CR['yy'][1] - self._CR['yy'][0]
-        xc = self._CR['xx'][0]-self._dx/2.
-        yc = self._CR['yy'][0]-self._dy/2.
+        xc = self._CR['xx'][0]# + self._dx# Giving us guard cells
+        yc = self._CR['yy'][0]# + self._dy
 
-        print 
+        print
 
         func(self.r,
              self._E,
@@ -384,10 +384,11 @@ class TPRun:
             v1 = v_i - dv_i/2.
             v2 = v_i + dv_i/2.
 
-
             self._v0[c,:] = np.random.random(self._npart)
             self._v0[c,:] = self._v0[c,:] * (v2 - v1) + v1
             c += 1
+
+    #==========================================================
 
     #==========================================================
     #==========================================================
@@ -433,7 +434,7 @@ class TPRun:
         vmag = sqrt(vmag)
         rmag = np.random.random(self._npart)
         for v_i in v:
-            self._v0[c,:] = dv*rmag*v_i/vmag 
+            self._v0[c,:] = dv*rmag*v_i/vmag
             c += 1
 
     #==========================================================
@@ -479,6 +480,57 @@ class TPRun:
             self._r0[c,:] = np.random.random(self._npart)
 
             self._r0[c,:]  = self._r0[c,:]* (r2 - r1) + r1
+
+            c += 1
+
+        self._velinit(v,dv)
+        #self._velinitn(v,dv)
+
+    #==========================================================
+
+    #==========================================================
+    #==========================================================
+    def load_randp(self,
+                   r,
+                   dr,
+                   v,
+                   dv):
+
+        """ loads particles randomly in a rectangle
+
+        The method loads the particles in a rectangle
+        of side 'dr' entered around 'r'.
+        Particles are loaded uniformly in that rectangle.
+        Velocities are uniformly distributed within 'dv' from 'v'
+
+        Carefull : this method will erase any initial position
+        and velocity that may have already been initialized.
+
+        @param r    : (x,y,z) center of the rectangle
+        @param dr   : (dx,dy,dz) size of the rectangle
+        @param v    : (Vx,Vy,Vz) mean initial velocity
+        @param dv   : (dVx,dVy,dVz) initial velocity interval
+
+        @return: @todo
+
+        Exemple  :
+
+        Creation : 2013-05-01 11:21:19.671182
+
+        """
+        print 'Loading particles in a spatially uniform random distribution...'
+
+        self._r0  = np.zeros((3, self._npart))
+
+        c = 0. # x, y and z components
+
+        for r_i, dr_i in zip(r, dr):
+
+            r1            = r_i - dr_i/2.
+            r2            = r_i + dr_i/2.
+            self._r0[c,:] = np.random.random(self._npart)
+
+            self._r0[c,:] = self._r0[c,:]* (r2 - r1) + r1
 
             c += 1
 

@@ -168,6 +168,8 @@ def ims(fdic,
         ax=None,
         extent=None,
         cbar=None,
+        cont=None,
+        no_draw=None,
         **kwargs):
     """
     A wrapper function for imshow to do most 
@@ -215,8 +217,8 @@ def ims(fdic,
     #ax.yaxis.set_minor_locator(minorLocator)
 
     plt.minorticks_on()
-    plt.sca(old_ax)
 
+    return_tup = im,
     # Code to implement for a cbar
     if cbar:
         divider = make_axes_locatable(ax)
@@ -226,11 +228,26 @@ def ims(fdic,
         cax.xaxis.set_tick_params(which='both',labelsize=8)
         cax.yaxis.set_tick_params(which='both',labelsize=8)
 
-        plt.draw()
-        return im,cax
+        return_tup += (cax,)
 
+    if cont:
+        if 'psi' in fdic:
+            psi = fdic['psi']
+        else:
+            psi = calc_psi(fdic)
+
+        cts = ax.contour(fdic['xx'],fdic['yy'],psi,colors='k')
+
+        return_tup += (cts,)
+
+    if not no_draw:
+        plt.draw()
+    plt.sca(old_ax)
+
+    if len(return_tup) == 1:
+        return return_tup[0]
     else:
-        return im
+        return return_tup
 
 
 #======================================================
@@ -348,7 +365,7 @@ def avg_movie(fname=None,
         print 'TOTAL TIME: %f'%(time.time() - t)
 
     else:
-    ## First way I tried, maybe slow?
+    ## First way I tried, may be slow?
         CC = p3d_run('local',param=param)
         print 'Loading time %i'%0
         CR = CC.load_movie('all',0,mov)
@@ -655,3 +672,8 @@ def calc_pdf(ar,min=99999,max=99999,weight=100,inc=0,ax=0):
       pdf[i] = weight/(arr[start:start+weight].max()-arr[start:start+weight].min())
    pdf = pdf/arsize
    return binvals,pdf
+
+
+def date_file_prefix():
+    import datetime
+    return datetime.date.today().strftime('%y.%m.%d')
