@@ -283,7 +283,7 @@ def show_energy(fname=None):
 
 def calc_psi(CR):
 # Calculating Psi                                                                                   
-    if 'bzav' in CR:
+    if 'bxav' in CR and 'byav' in CR:
         bx = CR['bxav']
         by = CR['byav']
     else:
@@ -656,3 +656,7 @@ def calc_pdf(ar,min=99999,max=99999,weight=100,inc=0,ax=0):
       pdf[i] = weight/(arr[start:start+weight].max()-arr[start:start+weight].min())
    pdf = pdf/arsize
    return binvals,pdf
+
+def rs3d(arr):
+    """ Reshape an array as a 3D array (for Tulasi's stupid code)"""
+    return arr.reshape(arr.shape + (1,))
