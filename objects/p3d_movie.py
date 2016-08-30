@@ -85,7 +85,7 @@ class p3d_movie(object):
             fname = os.path.abspath(fname)
             print "Loading movie.log file '%s'"%fname
             #Read moive.log
-            movie_log_arr = np.loadtxt(fname) 
+            movie_log_arr = np.loadtxt(fname)
             self.num_of_times = len(movie_log_arr)/len(self.movie_arr)
             print "movie.log '%s' has %i time slices"%(fname,self.num_of_times)
             
@@ -95,11 +95,13 @@ class p3d_movie(object):
                 self.movie_log_dict[self.movie_arr[n%len(self.movie_arr)]].append(movie_log_arr[n,:]) 
 
         else:
-            fname = self.movie_path+'/movie.bz.'+self.movie_num_str
+            fname = self.movie_path+'/movie.jz.'+self.movie_num_str
             nex = self.param_dict['pex']*self.param_dict['nx']
             ney = self.param_dict['pey']*self.param_dict['ny']
 
-            print  os.path.getsize(fname)/4/nex/ney
+            #pdb.set_trace()
+            print 'Data is in Four Byte format'
+            print os.path.getsize(fname)/4/nex/ney
             self.num_of_times = os.path.getsize(fname)/4/nex/ney
             for k in self.movie_arr:
                 self.movie_log_dict[k] = [np.array([0.,1.]) for c in 
@@ -231,10 +233,10 @@ class p3d_movie(object):
         
 
     def _movie_num_options(self):
-        choices = glob.glob(self.movie_path+'/movie.bz.*')
+        choices = glob.glob(self.movie_path+'/movie.jz.*')
         if len(choices) == 0: 
             print '!!! WARNING: the direcotry we are looking in does not'\
-                  ' have any moive.bz.XXX so we are crashing'
+                  ' have any moive.log.XXX so we are crashing'
             return -1
         for var in range(np.size(choices)):
             choices[var] = choices[var][-3:]
