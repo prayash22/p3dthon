@@ -170,6 +170,7 @@ def ims(fdic,
         cbar=None,
         cont=None,
         no_draw=None,
+        ctargs={},
         **kwargs):
     """
     A wrapper function for imshow to do most 
@@ -235,8 +236,10 @@ def ims(fdic,
             psi = fdic['psi']
         else:
             psi = calc_psi(fdic)
-
-        cts = ax.contour(fdic['xx'],fdic['yy'],psi,colors='k')
+        if 'colors' not in ctargs: ctargs['colors'] = 'k'
+        if 'linestyles' not in ctargs: ctargs['linestyles'] = 'solid'
+        
+        cts = ax.contour(fdic['xx'],fdic['yy'],psi,**ctargs)
 
         return_tup += (cts,)
 
@@ -249,6 +252,52 @@ def ims(fdic,
     else:
         return return_tup
 
+#======================================================
+
+def find_xpt(d):
+    psi = calc_psi(d)
+    jp = int(np.round(len(d['yy'])/2.))
+    yp = d['yy'][jp]
+
+    if 'bxav' in d: av = 'av'
+    else: av = ''
+    lBm = np.mean(d['bx'+av][:jp,:])
+    uBm = np.mean(d['bx'+av][jp:,:])
+
+    if lBm > uBm: #Upper
+        ip = psi[jp,:].argmax()
+        print 'Finding upper max'
+    else:         #Lower
+        ip = psi[jp,:].argmin()
+        print 'Finding lower min'
+    xp = d['xx'][ip]
+
+    return ip,jp,xp,yp
+
+#======================================================
+    
+def ims_subplot(d,var,ax,window,**kwargs):
+    ix = lambda x,xx: np.abs(xx - x).argmin()
+    iwd = [ix(w,d[v]) for w,v in zip(window,['xx','yy','xx','yy'])]
+    
+    if 'bxav' in d: av = 'av'
+    else: av = ''
+    td = {'xx':d['xx'][iwd[0]:iwd[2]],
+          'yy':d['yy'][iwd[1]:iwd[3]],
+          'bx'+av:d['bx'+av][iwd[1]:iwd[3], iwd[0]:iwd[2]],
+          'by'+av:d['by'+av][iwd[1]:iwd[3], iwd[0]:iwd[2]],
+          'bz'+av:d['bz'+av][iwd[1]:iwd[3], iwd[0]:iwd[2]]}
+
+    rst = ims(td, var[iwd[1]:iwd[3], iwd[0]:iwd[2]], ax, **kwargs)
+
+    return rst 
+
+#======================================================
+
+def shift_to_xpt_frame(d):
+    ip,jp,xp,yp = find_xpt(d)
+    d['xx'] = d['xx'] - xp  
+    d['yy'] = d['yy'] - yp  
 
 #======================================================
 
