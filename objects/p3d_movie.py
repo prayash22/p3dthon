@@ -240,7 +240,7 @@ class p3d_movie(object):
             return -1
         for var in range(np.size(choices)):
             choices[var] = choices[var][-3:]
-        print 'Select from the following possible moive numbers: \n'+str(choices),
+        print 'Select from the following possible movie numbers: \n'+str(choices),
         movie_num_int = raw_input()
         return int(movie_num_int)
             
