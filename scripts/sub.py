@@ -168,6 +168,9 @@ def ims(fdic,
         ax=None,
         extent=None,
         cbar=None,
+        cont=None,
+        no_draw=None,
+        ctargs={},
         **kwargs):
     """
     A wrapper function for imshow to do most 
@@ -215,8 +218,8 @@ def ims(fdic,
     #ax.yaxis.set_minor_locator(minorLocator)
 
     plt.minorticks_on()
-    plt.sca(old_ax)
 
+    return_tup = im,
     # Code to implement for a cbar
     if cbar:
         divider = make_axes_locatable(ax)
@@ -226,12 +229,75 @@ def ims(fdic,
         cax.xaxis.set_tick_params(which='both',labelsize=8)
         cax.yaxis.set_tick_params(which='both',labelsize=8)
 
+        return_tup += (cax,)
+
+    if cont:
+        if 'psi' in fdic:
+            psi = fdic['psi']
+        else:
+            psi = calc_psi(fdic)
+        if 'colors' not in ctargs: ctargs['colors'] = 'k'
+        if 'linestyles' not in ctargs: ctargs['linestyles'] = 'solid'
+        
+        cts = ax.contour(fdic['xx'],fdic['yy'],psi,**ctargs)
+
+        return_tup += (cts,)
+
+    if not no_draw:
         plt.draw()
-        return im,cax
+    plt.sca(old_ax)
 
+    if len(return_tup) == 1:
+        return return_tup[0]
     else:
-        return im
+        return return_tup
 
+#======================================================
+
+def find_xpt(d):
+    psi = calc_psi(d)
+    jp = int(np.round(len(d['yy'])/2.))
+    yp = d['yy'][jp]
+
+    if 'bxav' in d: av = 'av'
+    else: av = ''
+    lBm = np.mean(d['bx'+av][:jp,:])
+    uBm = np.mean(d['bx'+av][jp:,:])
+
+    if lBm > uBm: #Upper
+        ip = psi[jp,:].argmax()
+        print 'Finding upper max'
+    else:         #Lower
+        ip = psi[jp,:].argmin()
+        print 'Finding lower min'
+    xp = d['xx'][ip]
+
+    return ip,jp,xp,yp
+
+#======================================================
+    
+def ims_subplot(d,var,ax,window,**kwargs):
+    ix = lambda x,xx: np.abs(xx - x).argmin()
+    iwd = [ix(w,d[v]) for w,v in zip(window,['xx','yy','xx','yy'])]
+    
+    if 'bxav' in d: av = 'av'
+    else: av = ''
+    td = {'xx':d['xx'][iwd[0]:iwd[2]],
+          'yy':d['yy'][iwd[1]:iwd[3]],
+          'bx'+av:d['bx'+av][iwd[1]:iwd[3], iwd[0]:iwd[2]],
+          'by'+av:d['by'+av][iwd[1]:iwd[3], iwd[0]:iwd[2]],
+          'bz'+av:d['bz'+av][iwd[1]:iwd[3], iwd[0]:iwd[2]]}
+
+    rst = ims(td, var[iwd[1]:iwd[3], iwd[0]:iwd[2]], ax, **kwargs)
+
+    return rst 
+
+#======================================================
+
+def shift_to_xpt_frame(d):
+    ip,jp,xp,yp = find_xpt(d)
+    d['xx'] = d['xx'] - xp  
+    d['yy'] = d['yy'] - yp  
 
 #======================================================
 
@@ -261,6 +327,7 @@ def var_at(fdic,key,r0,ordflg='idl'):
 #======================================================
 
 def load_movie(**kwargs):
+
     return p3d_run('local').load_movie('all')
 
 #======================================================
@@ -282,7 +349,7 @@ def show_energy(fname=None):
 
 def calc_psi(CR):
 # Calculating Psi                                                                                   
-    if 'bzav' in CR:
+    if 'bxav' in CR and 'byav' in CR:
         bx = CR['bxav']
         by = CR['byav']
     else:
@@ -348,7 +415,7 @@ def avg_movie(fname=None,
         print 'TOTAL TIME: %f'%(time.time() - t)
 
     else:
-    ## First way I tried, maybe slow?
+    ## First way I tried, may be slow?
         CC = p3d_run('local',param=param)
         print 'Loading time %i'%0
         CR = CC.load_movie('all',0,mov)
@@ -655,3 +722,11 @@ def calc_pdf(ar,min=99999,max=99999,weight=100,inc=0,ax=0):
       pdf[i] = weight/(arr[start:start+weight].max()-arr[start:start+weight].min())
    pdf = pdf/arsize
    return binvals,pdf
+
+def rs3d(arr):
+    """ Reshape an array as a 3D array (for Tulasi's stupid code)"""
+    return arr.reshape(arr.shape + (1,))
+
+def date_file_prefix():
+    import datetime
+    return datetime.date.today().strftime('%y.%m.%d')
